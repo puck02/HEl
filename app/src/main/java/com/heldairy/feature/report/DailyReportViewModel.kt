@@ -48,8 +48,42 @@ class DailyReportViewModel(
     }
 
     fun onOptionSelected(questionId: String, optionId: String) {
-        answers.update { current -> current + (questionId to DailyAnswerPayload.Choice(optionId)) }
-        refreshUi()
+        val question = questionById[questionId] ?: return
+        val didUpdate = when (val kind = question.kind) {
+            is QuestionKind.SingleChoice -> {
+                answers.update { current -> current + (questionId to DailyAnswerPayload.Choice(optionId)) }
+                true
+            }
+
+            is QuestionKind.MultipleChoice -> {
+                val currentSelections =
+                    (answers.value[questionId] as? DailyAnswerPayload.MultiChoice)?.optionIds ?: emptySet()
+                val nextSelections = if (optionId in currentSelections) {
+                    currentSelections - optionId
+                } else {
+                    currentSelections + optionId
+                }
+                if (nextSelections.size > kind.maxSelection) {
+                    viewModelScope.launch {
+                        _events.emit(DailyReportEvent.Snackbar("最多可以选择 ${kind.maxSelection} 个关注点。"))
+                    }
+                    return
+                }
+                answers.update { current ->
+                    if (nextSelections.isEmpty()) {
+                        current - questionId
+                    } else {
+                        current + (questionId to DailyAnswerPayload.MultiChoice(nextSelections))
+                    }
+                }
+                true
+            }
+
+            else -> false
+        }
+        if (didUpdate) {
+            refreshUi()
+        }
     }
 
     fun onSliderValueChanged(questionId: String, value: Float) {
@@ -141,6 +175,18 @@ class DailyReportViewModel(
                         selectedOptionId = selected
                     )
                 }
+
+                is QuestionKind.MultipleChoice -> {
+                    val selected = (answer as? DailyAnswerPayload.MultiChoice)?.optionIds ?: emptySet()
+                    QuestionUiState.MultipleChoice(
+                        question = question,
+                        isVisible = isVisible,
+                        isAnswered = isAnswered,
+                        selectedOptionIds = selected,
+                        maxSelection = kind.maxSelection,
+                        helperText = kind.helper
+                    )
+                }
                 is QuestionKind.Slider -> {
                     val committed = (answer as? DailyAnswerPayload.Slider)?.value
                     val draft = sliderSnapshot[question.id]
@@ -189,6 +235,10 @@ class DailyReportViewModel(
         }
         return when (question.kind) {
             is QuestionKind.SingleChoice -> (answer as? DailyAnswerPayload.Choice) != null
+            is QuestionKind.MultipleChoice -> {
+                val selections = (answer as? DailyAnswerPayload.MultiChoice)?.optionIds
+                !selections.isNullOrEmpty()
+            }
             is QuestionKind.Slider -> (answer as? DailyAnswerPayload.Slider) != null
             is QuestionKind.TextInput -> {
                 val textValue = (answer as? DailyAnswerPayload.Text)?.value.orEmpty()
@@ -210,6 +260,22 @@ class DailyReportViewModel(
                     answerValue = option.id,
                     answerLabel = option.label,
                     metadataJson = option.helper
+                )
+            }
+
+            is QuestionKind.MultipleChoice -> {
+                val selection = (answer as? DailyAnswerPayload.MultiChoice)?.optionIds?.takeIf { it.isNotEmpty() }
+                    ?: return null
+                val selectedOptions = kind.options.filter { it.id in selection }
+                if (selectedOptions.isEmpty()) return null
+                DailyAnswerRecord(
+                    questionId = id,
+                    stepIndex = step.index,
+                    order = order,
+                    answerType = "multi_choice",
+                    answerValue = selectedOptions.joinToString(",") { it.id },
+                    answerLabel = selectedOptions.joinToString(" / ") { it.label },
+                    metadataJson = kind.helper
                 )
             }
 
@@ -260,6 +326,15 @@ sealed interface QuestionUiState {
         override val isVisible: Boolean,
         override val isAnswered: Boolean,
         val selectedOptionId: String?
+    ) : QuestionUiState
+
+    data class MultipleChoice(
+        override val question: DailyQuestion,
+        override val isVisible: Boolean,
+        override val isAnswered: Boolean,
+        val selectedOptionIds: Set<String>,
+        val maxSelection: Int,
+        val helperText: String?
     ) : QuestionUiState
 
     data class Slider(

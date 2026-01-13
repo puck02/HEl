@@ -18,6 +18,21 @@ interface DailyReportDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertResponses(responses: List<QuestionResponseEntity>)
 
+    @Query("SELECT id FROM daily_entries WHERE entry_date = :entryDate LIMIT 1")
+    suspend fun findEntryIdByDate(entryDate: String): Long?
+
+    @Query("DELETE FROM daily_entries WHERE id = :entryId")
+    suspend fun deleteEntryById(entryId: Long)
+
+    @Transaction
+    suspend fun replaceEntryWithResponses(
+        entry: DailyEntryEntity,
+        responses: List<QuestionResponseEntity>
+    ): Long {
+        findEntryIdByDate(entry.entryDate)?.let { deleteEntryById(it) }
+        return insertEntryWithResponses(entry, responses)
+    }
+
     @Transaction
     suspend fun insertEntryWithResponses(
         entry: DailyEntryEntity,

@@ -43,7 +43,7 @@ class DailyReportRepository(
             )
         }
         try {
-            val entryId = dailyReportDao.insertEntryWithResponses(entry, responseEntities)
+            val entryId = dailyReportDao.replaceEntryWithResponses(entry, responseEntities)
             Result.success(entryId)
         } catch (t: Throwable) {
             Result.failure(t)

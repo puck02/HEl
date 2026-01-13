@@ -13,6 +13,11 @@ data class QuestionOption(
 
 sealed interface QuestionKind {
     data class SingleChoice(val options: List<QuestionOption>) : QuestionKind
+    data class MultipleChoice(
+        val options: List<QuestionOption>,
+        val maxSelection: Int,
+        val helper: String? = null
+    ) : QuestionKind
     data class Slider(
         val valueRange: IntRange,
         val defaultValue: Int = valueRange.first,
@@ -62,7 +67,7 @@ object DailyQuestionBank {
             step = DailyQuestionStep.Greeting,
             order = 1,
             required = true,
-            kind = QuestionKind.SingleChoice(
+            kind = QuestionKind.MultipleChoice(
                 options = listOf(
                     QuestionOption("head", "头痛"),
                     QuestionOption("neck_back", "颈肩腰"),
@@ -73,7 +78,9 @@ object DailyQuestionBank {
                     QuestionOption("sleep", "睡眠"),
                     QuestionOption("period", "经期"),
                     QuestionOption("none", "没有特别")
-                )
+                ),
+                maxSelection = 3,
+                helper = "最多选择 3 个关注点"
             )
         ),
         DailyQuestion(

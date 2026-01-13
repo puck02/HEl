@@ -205,6 +205,7 @@ private fun QuestionCard(
             )
             when (questionState) {
                 is QuestionUiState.SingleChoice -> ChoiceSection(questionState, onOptionSelected)
+                is QuestionUiState.MultipleChoice -> MultiChoiceSection(questionState, onOptionSelected)
                 is QuestionUiState.Slider -> SliderSection(questionState, onSliderValueChange, onSliderValueFinished)
                 is QuestionUiState.TextInput -> TextInputSection(questionState, onTextChanged)
             }
@@ -227,6 +228,42 @@ private fun ChoiceSection(
                 label = { Text(option.label) },
                 border = FilterChipDefaults.filterChipBorder(enabled = true, selected = option.id == state.selectedOptionId)
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MultiChoiceSection(
+    state: QuestionUiState.MultipleChoice,
+    onOptionSelected: (String, String) -> Unit
+) {
+    val options = (state.question.kind as QuestionKind.MultipleChoice).options
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            options.forEach { option ->
+                val selected = state.selectedOptionIds.contains(option.id)
+                FilterChip(
+                    selected = selected,
+                    onClick = { onOptionSelected(state.question.id, option.id) },
+                    label = { Text(option.label) },
+                    border = FilterChipDefaults.filterChipBorder(enabled = true, selected = selected)
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "已选 ${state.selectedOptionIds.size}/${state.maxSelection}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            state.helperText?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -317,5 +354,12 @@ private fun SubmitBar(
                 }
             }
         }
+        Text(
+            text = "需要调整？可重新填写，我会以最新记录为准。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
     }
 }

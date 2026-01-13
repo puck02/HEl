@@ -9,7 +9,7 @@ import com.heldairy.core.database.entity.QuestionResponseEntity
 
 @Database(
     entities = [DailyEntryEntity::class, QuestionResponseEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class DailyReportDatabase : RoomDatabase() {
