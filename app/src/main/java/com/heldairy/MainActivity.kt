@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.heldairy.feature.report.ui.DailyReportRoute
+import com.heldairy.feature.settings.ui.SettingsRoute
 import com.heldairy.ui.theme.HElDairyTheme
 
 class MainActivity : ComponentActivity() {
@@ -96,6 +97,7 @@ fun HElDairyApp() {
         ) { innerPadding ->
             when (selectedIndex) {
                 1 -> DailyReportRoute(paddingValues = innerPadding)
+                3 -> SettingsRoute(paddingValues = innerPadding)
                 else -> TabContent(
                     paddingValues = innerPadding,
                     content = tabs[selectedIndex].description

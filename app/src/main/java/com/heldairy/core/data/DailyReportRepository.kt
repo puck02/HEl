@@ -1,8 +1,11 @@
 package com.heldairy.core.data
 
 import com.heldairy.core.database.DailyReportDao
+import com.heldairy.core.database.entity.DailyAdviceEntity
 import com.heldairy.core.database.entity.DailyEntryEntity
+import com.heldairy.core.database.entity.DailyEntrySnapshot
 import com.heldairy.core.database.entity.DailyEntryWithResponses
+import com.heldairy.core.database.entity.DailySummaryEntity
 import com.heldairy.core.database.entity.QuestionResponseEntity
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +17,8 @@ class DailyReportRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     fun latestEntry(): Flow<DailyEntryWithResponses?> = dailyReportDao.observeLatestEntry()
+
+    fun latestSnapshot(): Flow<DailyEntrySnapshot?> = dailyReportDao.observeLatestSnapshot()
 
     suspend fun recordDailyReport(
         entryDate: String,
@@ -48,6 +53,22 @@ class DailyReportRepository(
         } catch (t: Throwable) {
             Result.failure(t)
         }
+    }
+
+    suspend fun loadRecentEntries(limit: Int): List<DailyEntryWithResponses> = withContext(ioDispatcher) {
+        dailyReportDao.loadRecentEntries(limit)
+    }
+
+    suspend fun getEntry(entryId: Long): DailyEntryWithResponses? = withContext(ioDispatcher) {
+        dailyReportDao.getEntryWithResponses(entryId)
+    }
+
+    suspend fun saveSummary(summary: DailySummaryEntity) = withContext(ioDispatcher) {
+        dailyReportDao.upsertSummary(summary)
+    }
+
+    suspend fun saveAdvice(advice: DailyAdviceEntity) = withContext(ioDispatcher) {
+        dailyReportDao.upsertAdvice(advice)
     }
 }
 

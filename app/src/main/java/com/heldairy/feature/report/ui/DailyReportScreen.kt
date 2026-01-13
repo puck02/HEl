@@ -1,6 +1,7 @@
 package com.heldairy.feature.report.ui
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,17 +12,24 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -32,6 +40,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,11 +52,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.collectLatest
+import com.heldairy.core.data.AdvicePayload
+import com.heldairy.core.data.AdviceSource
 import com.heldairy.feature.report.DailyReportEvent
 import com.heldairy.feature.report.DailyReportUiState
 import com.heldairy.feature.report.DailyReportViewModel
 import com.heldairy.feature.report.QuestionUiState
 import com.heldairy.feature.report.StepProgress
+import com.heldairy.feature.report.AdviceUiState
 import com.heldairy.feature.report.model.QuestionKind
 
 @Composable
@@ -57,6 +69,7 @@ fun DailyReportRoute(
     viewModel: DailyReportViewModel = viewModel(factory = DailyReportViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val adviceState by viewModel.adviceState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(viewModel) {
@@ -74,11 +87,14 @@ fun DailyReportRoute(
     ) {
         DailyReportScreen(
             state = state,
+            adviceState = adviceState,
             onOptionSelected = viewModel::onOptionSelected,
             onSliderValueChange = viewModel::onSliderValueChanged,
             onSliderValueChangeFinished = viewModel::onSliderValueChangeFinished,
             onTextChanged = viewModel::onTextChanged,
             onSubmit = viewModel::submitDailyReport,
+            onAdviceRetry = viewModel::refreshAdvice,
+            onToggleAdviceCollapse = viewModel::toggleAdviceCollapse,
             modifier = Modifier.fillMaxSize()
         )
         SnackbarHost(
@@ -93,11 +109,14 @@ fun DailyReportRoute(
 @Composable
 fun DailyReportScreen(
     state: DailyReportUiState,
+    adviceState: AdviceUiState,
     onOptionSelected: (String, String) -> Unit,
     onSliderValueChange: (String, Float) -> Unit,
     onSliderValueChangeFinished: (String) -> Unit,
     onTextChanged: (String, String) -> Unit,
     onSubmit: () -> Unit,
+    onAdviceRetry: () -> Unit,
+    onToggleAdviceCollapse: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -137,6 +156,12 @@ fun DailyReportScreen(
             canSubmit = state.canSubmit,
             isSaving = state.isSaving,
             onSubmit = onSubmit,
+            modifier = Modifier.fillMaxWidth()
+        )
+        AdviceSection(
+            adviceState = adviceState,
+            onRetry = onAdviceRetry,
+            onToggleCollapse = onToggleAdviceCollapse,
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -362,4 +387,163 @@ private fun SubmitBar(
             textAlign = TextAlign.Center
         )
     }
+}
+
+@Composable
+private fun AdviceSection(
+    adviceState: AdviceUiState,
+    onRetry: () -> Unit,
+    onToggleCollapse: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggleCollapse),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Step 3 · AI 今日建议",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = if (adviceState.isCollapsed) Icons.Outlined.ExpandMore else Icons.Outlined.ExpandLess,
+                contentDescription = if (adviceState.isCollapsed) "展开" else "收起"
+            )
+        }
+
+        if (!adviceState.isCollapsed) {
+            when {
+                !adviceState.aiEnabled -> AdviceInfoCard("AI 功能已关闭，请在“设置”中开启以获取生活管家建议。")
+                adviceState.apiKeyMissing -> AdviceInfoCard("请在“设置”中填写 DeepSeek API Key，我会立刻为你生成建议。")
+                adviceState.isGenerating -> AdviceLoadingCard()
+                adviceState.advice != null -> AdviceResultCard(
+                    payload = adviceState.advice,
+                    generatedAt = adviceState.lastGeneratedAt,
+                    isFallback = adviceState.isFallback,
+                    isCollapsed = adviceState.isCollapsed
+                )
+                adviceState.errorMessage != null -> AdviceErrorCard(adviceState.errorMessage, onRetry)
+                else -> AdviceInfoCard("完成基础问题后，我会立刻生成个性化建议。")
+            }
+            if (adviceState.canRequestAdvice) {
+                TextButton(onClick = onRetry, enabled = !adviceState.isGenerating) {
+                    Text("重新生成 AI 建议")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdviceInfoCard(message: String) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(16.dp)
+        )
+    }
+}
+
+@Composable
+private fun AdviceLoadingCard() {
+    Card {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            Text("AI 正在整理建议，请稍等…")
+        }
+    }
+}
+
+@Composable
+private fun AdviceErrorCard(message: String, onRetry: () -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Button(onClick = onRetry) {
+                Text("重试生成")
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdviceResultCard(
+    payload: AdvicePayload,
+    generatedAt: Long?,
+    isFallback: Boolean,
+    isCollapsed: Boolean
+) {
+    Card {
+        val scrollState = rememberScrollState()
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
+                .heightIn(max = 320.dp)
+                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            generatedAt?.let {
+                Text(
+                    text = "生成时间：${formatTimestamp(it)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (isFallback || payload.source == AdviceSource.FALLBACK) {
+                Text(
+                    text = "AI 建议暂时不可用，以下为基础建议。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
+            if (!isCollapsed) {
+                AdviceListBlock(title = "观察", items = payload.observations)
+                AdviceListBlock(title = "建议", items = payload.actions)
+                AdviceListBlock(title = "明日关注", items = payload.tomorrowFocus)
+                if (payload.redFlags.isNotEmpty()) {
+                    AdviceListBlock(title = "提醒", items = payload.redFlags)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdviceListBlock(title: String, items: List<String>) {
+    if (items.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(text = title, style = MaterialTheme.typography.titleSmall)
+        items.forEach { item ->
+            Text(
+                text = "• $item",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+private fun formatTimestamp(epochMillis: Long): String {
+    val instant = java.time.Instant.ofEpochMilli(epochMillis)
+    val zone = java.time.ZoneId.systemDefault()
+    val local = java.time.LocalDateTime.ofInstant(instant, zone)
+    return "${local.monthValue}月${local.dayOfMonth}日 ${local.hour}:${local.minute.toString().padStart(2, '0')}"
 }

@@ -159,3 +159,115 @@ M5：迁移与导出
 M6：打包交付
 - ./gradlew assembleDebug
 - README：安装、迁移、API Key 设置说明
+
+====================
+六、用药管理（新增，重点：结构化疗程 + 自然语言事件 + AI 辅助解析）
+====================
+
+目标：
+- 提供“用药记录/用药管理”能力，支持用户输入用药的开始/结束时间、频率、是否中断等信息
+- 用户可在任意时间进入用药管理页，输入一段自然语言描述（例如：“我最近感冒了，XXX药就先停了，先吃感冒药YYY。”）
+- App 通过 DeepSeek 将自然语言解析为结构化变更草稿（新增药品/开始疗程/暂停/结束等），并要求用户确认后落库
+- 用药信息会随“日报”一并提供给 AI，用于更个性化的追问与建议（但不做诊断、不改药）
+
+数据模型（Room）：
+
+1) 药品库 Med
+- id: Long (PK)
+- name: String（药名，显示用）
+- aliases: String?（可选，逗号分隔；用于匹配用户输入）
+- createdAt: Long
+- updatedAt: Long
+- note: String?（用户自填备注，可选）
+- infoSummary: String?（药品介绍/用法用量/注意事项/不良反应的“摘要”，可由 AI/OCR 生成，最终可编辑）
+- imageUri: String?（可选，拍照/相册导入的图片 URI；MVP 可不做）
+
+2) 用药疗程 MedCourse（对应“开始时间/结束时间/频率/中断”）
+- id: Long (PK)
+- medId: Long (FK -> Med.id)
+- startDate: LocalDate
+- endDate: LocalDate?（空 = 仍在吃）
+- status: String（active / paused / ended）
+- frequencyText: String（例如：每日3次 / 每日1次 / 按需；先用文本，避免过度结构化）
+- doseText: String?（例如：每次1片 / 2片 / xx ml）
+- timeHints: String?（例如：早 / 中 / 晚 / 睡前）
+- createdAt: Long
+- updatedAt: Long
+
+3) 用药事件流 MedEvent（对应“随手输入的一段话”，可追溯、可用于 AI）
+- id: Long (PK)
+- createdAt: Long
+- rawText: String（用户原文）
+- detectedMedNamesJson: String?（AI 识别到的药名候选列表，JSON 字符串）
+- proposedActionsJson: String?（AI 提供的结构化变更草稿，JSON 字符串）
+- confirmedActionsJson: String?（用户确认后的变更，JSON 字符串）
+- applyResult: String?（success / failed + message）
+
+药品库展示规则（UI）：
+- 用药管理页展示“所有药品”
+- 若该药存在至少一个 status = active 的 MedCourse，则该药显示为绿色（正在吃）
+- 若该药没有 active 疗程（全部 ended / paused 或无疗程），显示为灰色（已停用/未在用）
+- 点击药品进入详情页：
+  - 显示药品介绍、用法用量、注意事项、不良反应（infoSummary，可编辑）
+  - 显示当前疗程（若有 active / paused）
+  - 显示历史疗程列表（时间线）
+
+自然语言输入与 AI 解析（DeepSeek，必须二次确认）：
+- 用药管理页提供输入框，用户可输入自然语言描述
+- 点击“解析/提交”后：
+  - 调用 DeepSeek，将 rawText + 当前药品库名称列表 + 当前 active 疗程摘要 一起发送
+  - DeepSeek 输出结构化 JSON（必须校验）：
+    - mentioned_meds[]：识别到的药名（含是否在库中）
+    - actions[]：建议动作列表
+      - actionType: add_med / start_course / pause_course / end_course / update_course / noop
+      - medName
+      - courseFields: startDate? endDate? status? frequencyText? doseText? timeHints?
+    - questions[]：最多 2 个澄清问题（优先选择题）
+- App 展示“变更草稿确认面板”：
+  - 新药默认生成 add_med 草稿，必须用户确认
+  - 所有开始/暂停/停药操作必须可手动调整关键字段
+- 用户确认后执行数据库变更，并保存 MedEvent
+- AI 解析失败或 JSON 校验失败：
+  - 明确提示失败原因
+  - 不允许生成假数据
+
+拍照 OCR 与摘要提取（可分阶段）：
+- 药品详情页支持拍照/选图
+- OCR 转文本（优先离线）
+- 将文本发送 DeepSeek 抽取摘要：
+  - name_candidates[]
+  - dosage_summary
+  - cautions_summary
+  - adverse_summary
+- 用户确认/编辑后写入 Med.infoSummary
+- 明确声明：仅为说明书信息整理，不构成医疗建议
+
+与日报联动：
+- 日报中的“用药是否按时”保持不变
+- AI 输入额外包含：
+  - activeMedsSummary（当前正在吃的药）
+  - todayMedChanges（当天用药事件摘要）
+  - adherenceHint（是否按时）
+
+====================
+七、里程碑（新增：用药管理）
+====================
+
+M7：用药管理（无 OCR）
+- Room：Med / MedCourse / MedEvent
+- 用药管理页 + 药品详情页
+- 结构化疗程管理（开始 / 暂停 / 结束）
+- ./gradlew build 通过
+
+M8：用药自然语言解析（DeepSeek）
+- rawText 输入
+- DeepSeek 返回结构化动作草稿
+- UI 二次确认后落库
+- JSON 校验与失败处理
+- ./gradlew build 通过
+
+M9：拍照 OCR + 摘要提取
+- 拍照/选图 -> OCR -> DeepSeek 摘要
+- 写入 Med.infoSummary
+- ./gradlew build 通过
+

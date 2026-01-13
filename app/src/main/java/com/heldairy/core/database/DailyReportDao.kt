@@ -5,8 +5,11 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import com.heldairy.core.database.entity.DailyAdviceEntity
 import com.heldairy.core.database.entity.DailyEntryEntity
+import com.heldairy.core.database.entity.DailyEntrySnapshot
 import com.heldairy.core.database.entity.DailyEntryWithResponses
+import com.heldairy.core.database.entity.DailySummaryEntity
 import com.heldairy.core.database.entity.QuestionResponseEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -17,6 +20,12 @@ interface DailyReportDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertResponses(responses: List<QuestionResponseEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAdvice(advice: DailyAdviceEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertSummary(summary: DailySummaryEntity)
 
     @Query("SELECT id FROM daily_entries WHERE entry_date = :entryDate LIMIT 1")
     suspend fun findEntryIdByDate(entryDate: String): Long?
@@ -47,4 +56,16 @@ interface DailyReportDao {
     @Transaction
     @Query("SELECT * FROM daily_entries ORDER BY created_at DESC LIMIT 1")
     fun observeLatestEntry(): Flow<DailyEntryWithResponses?>
+
+    @Transaction
+    @Query("SELECT * FROM daily_entries ORDER BY created_at DESC LIMIT 1")
+    fun observeLatestSnapshot(): Flow<DailyEntrySnapshot?>
+
+    @Transaction
+    @Query("SELECT * FROM daily_entries ORDER BY created_at DESC LIMIT :limit")
+    suspend fun loadRecentEntries(limit: Int): List<DailyEntryWithResponses>
+
+    @Transaction
+    @Query("SELECT * FROM daily_entries WHERE id = :entryId LIMIT 1")
+    suspend fun getEntryWithResponses(entryId: Long): DailyEntryWithResponses?
 }

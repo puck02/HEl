@@ -6,13 +6,20 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
+import com.heldairy.core.data.AdvicePayload
+import com.heldairy.core.data.AdviceSource
+import com.heldairy.core.data.DailyAdviceCoordinator
 import com.heldairy.core.data.DailyAnswerRecord
 import com.heldairy.core.data.DailyReportRepository
+import com.heldairy.core.data.DailySummaryManager
+import com.heldairy.core.database.entity.DailyEntrySnapshot
 import com.heldairy.feature.report.model.DailyAnswerPayload
 import com.heldairy.feature.report.model.DailyQuestion
 import com.heldairy.feature.report.model.DailyQuestionBank
 import com.heldairy.feature.report.model.DailyQuestionStep
 import com.heldairy.feature.report.model.QuestionKind
+import com.heldairy.core.preferences.AiPreferencesStore
+import com.heldairy.core.preferences.AiSettings
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -21,13 +28,20 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
 import kotlin.math.roundToInt
 
 class DailyReportViewModel(
     private val repository: DailyReportRepository,
-    private val clock: Clock = Clock.systemDefaultZone()
+    private val summaryManager: DailySummaryManager,
+    private val adviceCoordinator: DailyAdviceCoordinator,
+    private val aiPreferencesStore: AiPreferencesStore,
+    private val clock: Clock = Clock.systemDefaultZone(),
+    private val json: Json = Json { ignoreUnknownKeys = true }
 ) : ViewModel() {
 
     private val questions = DailyQuestionBank.questions.sortedBy { it.order }
@@ -40,11 +54,15 @@ class DailyReportViewModel(
     private val _uiState = MutableStateFlow(DailyReportUiState())
     val uiState: StateFlow<DailyReportUiState> = _uiState.asStateFlow()
 
+    private val _adviceState = MutableStateFlow(AdviceUiState())
+    val adviceState: StateFlow<AdviceUiState> = _adviceState.asStateFlow()
+
     private val _events = MutableSharedFlow<DailyReportEvent>(extraBufferCapacity = 1)
     val events = _events.asSharedFlow()
 
     init {
         refreshUi()
+        observeSnapshots()
     }
 
     fun onOptionSelected(questionId: String, optionId: String) {
@@ -134,18 +152,34 @@ class DailyReportViewModel(
                 answers = answerRecords,
                 createdAtMillis = now.toEpochMilli()
             )
-            result
-                .onSuccess {
-                    resetSession()
-                    _events.emit(DailyReportEvent.Snackbar("今日基础记录已保存，感谢你的分享。"))
-                }
-                .onFailure { throwable ->
-                    refreshUi(isSaving = false)
-                    val message = throwable.message?.takeIf { it.isNotBlank() }
-                        ?: "保存失败，请稍后重试。"
-                    _events.emit(DailyReportEvent.Snackbar(message))
-                }
+            val entryId = result.getOrNull()
+            if (entryId != null) {
+                resetSession()
+                _events.emit(DailyReportEvent.Snackbar("今日基础记录已保存，感谢你的分享。"))
+                summaryManager.regenerateForLatestEntry(entryId)
+                maybeTriggerAdvice(entryId, fromUser = false)
+            } else {
+                refreshUi(isSaving = false)
+                val throwable = result.exceptionOrNull()
+                val message = throwable?.message?.takeIf { it.isNotBlank() }
+                    ?: "保存失败，请稍后重试。"
+                _events.emit(DailyReportEvent.Snackbar(message))
+            }
         }
+    }
+
+    fun refreshAdvice() {
+        val entryId = _adviceState.value.entryId ?: run {
+            viewModelScope.launch {
+                _events.emit(DailyReportEvent.Snackbar("请先完成今日基础问题。"))
+            }
+            return
+        }
+        maybeTriggerAdvice(entryId, fromUser = true)
+    }
+
+    fun toggleAdviceCollapse() {
+        _adviceState.update { state -> state.copy(isCollapsed = !state.isCollapsed) }
     }
 
     private fun resetSession() {
@@ -153,6 +187,69 @@ class DailyReportViewModel(
         sliderDrafts.value = emptyMap()
         textDrafts.value = emptyMap()
         refreshUi(isSaving = false)
+    }
+
+    private fun observeSnapshots() {
+        viewModelScope.launch {
+            combine(
+                repository.latestSnapshot(),
+                aiPreferencesStore.settingsFlow
+            ) { snapshot, settings -> snapshot to settings }
+                .collect { (snapshot, settings) ->
+                    updateAdviceSnapshot(snapshot, settings)
+                }
+        }
+    }
+
+    private fun updateAdviceSnapshot(snapshot: DailyEntrySnapshot?, settings: AiSettings) {
+        val payload = snapshot?.advice?.adviceJson?.let { raw ->
+            runCatching { json.decodeFromString(AdvicePayload.serializer(), raw) }.getOrNull()
+        }
+        val keepCollapsed = _adviceState.value.isCollapsed
+        _adviceState.update { current ->
+            current.copy(
+                entryId = snapshot?.entry?.id,
+                entryDate = snapshot?.entry?.entryDate,
+                advice = payload,
+                lastGeneratedAt = snapshot?.advice?.generatedAt,
+                aiEnabled = settings.aiEnabled,
+                apiKeyMissing = settings.apiKey.isBlank(),
+                errorMessage = if (settings.aiEnabled && settings.apiKey.isNotBlank()) current.errorMessage else null,
+                isFallback = payload?.source == AdviceSource.FALLBACK,
+                isCollapsed = if (payload == null) false else keepCollapsed
+            )
+        }
+    }
+
+    private fun maybeTriggerAdvice(entryId: Long, fromUser: Boolean) {
+        val currentAdvice = _adviceState.value
+        if (!currentAdvice.aiEnabled) {
+            if (fromUser) {
+                viewModelScope.launch {
+                    _events.emit(DailyReportEvent.Snackbar("AI 功能已关闭，可在设置中开启。"))
+                }
+            }
+            return
+        }
+        if (currentAdvice.apiKeyMissing) {
+            viewModelScope.launch {
+                _events.emit(DailyReportEvent.Snackbar("请在设置里填写 DeepSeek API Key。"))
+            }
+            return
+        }
+        viewModelScope.launch {
+            _adviceState.update { it.copy(isGenerating = true, errorMessage = null) }
+            val result = adviceCoordinator.generateAdviceForEntry(entryId)
+            if (result.isSuccess) {
+                _adviceState.update { it.copy(isGenerating = false, errorMessage = null) }
+            } else {
+                val throwable = result.exceptionOrNull()
+                val message = throwable?.message?.takeIf { it.isNotBlank() }
+                    ?: "AI 建议暂时不可用"
+                _adviceState.update { it.copy(isGenerating = false, errorMessage = message) }
+                _events.emit(DailyReportEvent.Snackbar(message))
+            }
+        }
     }
 
     private fun refreshUi(isSaving: Boolean = _uiState.value.isSaving) {
@@ -310,7 +407,13 @@ class DailyReportViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HElDairyApplication)
-                DailyReportViewModel(app.container.dailyReportRepository)
+                val container = app.container
+                DailyReportViewModel(
+                    repository = container.dailyReportRepository,
+                    summaryManager = container.dailySummaryManager,
+                    adviceCoordinator = container.adviceCoordinator,
+                    aiPreferencesStore = container.aiPreferencesStore
+                )
             }
         }
     }
@@ -363,6 +466,22 @@ data class DailyReportUiState(
     val canSubmit: Boolean = false,
     val isSaving: Boolean = false
 )
+
+data class AdviceUiState(
+    val entryId: Long? = null,
+    val entryDate: String? = null,
+    val advice: AdvicePayload? = null,
+    val isGenerating: Boolean = false,
+    val aiEnabled: Boolean = true,
+    val apiKeyMissing: Boolean = true,
+    val errorMessage: String? = null,
+    val lastGeneratedAt: Long? = null,
+    val isFallback: Boolean = false,
+    val isCollapsed: Boolean = false
+) {
+    val canRequestAdvice: Boolean
+        get() = aiEnabled && !apiKeyMissing && entryId != null && !isGenerating
+}
 
 sealed interface DailyReportEvent {
     data class Snackbar(val message: String) : DailyReportEvent
