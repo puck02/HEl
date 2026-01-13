@@ -10,9 +10,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.EventNote
 import androidx.compose.material.icons.outlined.Assessment
-import androidx.compose.material.icons.outlined.Chat
-import androidx.compose.material.icons.outlined.EventNote
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.heldairy.feature.report.ui.DailyReportRoute
 import com.heldairy.ui.theme.HElDairyTheme
 
 class MainActivity : ComponentActivity() {
@@ -53,12 +54,12 @@ fun HElDairyApp() {
                 ConciergeTab(
                     title = "问候",
                     description = "欢迎来到生活管家，准备开始今日的关怀对话。",
-                    icon = Icons.Outlined.Chat
+                    icon = Icons.AutoMirrored.Outlined.Chat
                 ),
                 ConciergeTab(
                     title = "日报",
                     description = "今日的基础问题会在这里依序出现。",
-                    icon = Icons.Outlined.EventNote
+                    icon = Icons.AutoMirrored.Outlined.EventNote
                 ),
                 ConciergeTab(
                     title = "洞察",
@@ -93,7 +94,13 @@ fun HElDairyApp() {
                 }
             }
         ) { innerPadding ->
-            TabContent(paddingValues = innerPadding, content = tabs[selectedIndex].description)
+            when (selectedIndex) {
+                1 -> DailyReportRoute(paddingValues = innerPadding)
+                else -> TabContent(
+                    paddingValues = innerPadding,
+                    content = tabs[selectedIndex].description
+                )
+            }
         }
     }
 }
@@ -119,7 +126,7 @@ private fun TabContent(paddingValues: PaddingValues, content: String) {
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "M0 占位内容，后续里程碑会替换为真实的对话体验。",
+                text = "功能逐步上线中，生活管家会很快来到这里。",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center
             )
