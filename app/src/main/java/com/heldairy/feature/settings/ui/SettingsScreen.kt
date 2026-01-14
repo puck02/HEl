@@ -26,6 +26,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -131,7 +133,6 @@ fun SettingsRoute(
             onSaveApiKey = viewModel::saveApiKey,
             onClearApiKey = viewModel::clearApiKey,
             onAiEnabledChanged = viewModel::onAiEnabledChanged,
-            onThemeChanged = viewModel::onThemeChanged,
             onExportJson = { exportJsonLauncher.launch(defaultBackupFileName("json")) },
             onExportCsv = { exportCsvLauncher.launch(defaultBackupFileName("csv")) },
             onImportJson = { importJsonLauncher.launch("application/json") },
@@ -149,15 +150,16 @@ fun SettingsScreen(
     onSaveApiKey: () -> Unit,
     onClearApiKey: () -> Unit,
     onAiEnabledChanged: (Boolean) -> Unit,
-    onThemeChanged: (Boolean) -> Unit,
     onExportJson: () -> Unit,
     onExportCsv: () -> Unit,
     onImportJson: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scrollState = rememberScrollState()
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -167,13 +169,6 @@ fun SettingsScreen(
             Switch(
                 checked = state.aiEnabled,
                 onCheckedChange = onAiEnabledChanged
-            )
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(text = "夜间模式")
-            Switch(
-                checked = state.isDarkTheme,
-                onCheckedChange = onThemeChanged
             )
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

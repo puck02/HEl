@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Nightlight
 import androidx.compose.material.icons.outlined.RunCircle
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -31,6 +32,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -40,6 +42,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -192,6 +195,7 @@ data class ConciergeTab(
 private fun HomeGreetingRoute(paddingValues: PaddingValues, onStartDaily: () -> Unit) {
     val isPreview = LocalInspectionMode.current
     if (isPreview) {
+        var previewDarkTheme by remember { mutableStateOf(false) }
         val previewState = HomeDashboardUiState(
             hasTodayEntry = true,
             steps = MetricDisplay(value = "8,240", hint = "已达标"),
@@ -202,17 +206,23 @@ private fun HomeGreetingRoute(paddingValues: PaddingValues, onStartDaily: () -> 
         HomeGreetingScreen(
             paddingValues = paddingValues,
             uiState = previewState,
-            onStartDaily = onStartDaily
+            onStartDaily = onStartDaily,
+            isDarkTheme = previewDarkTheme,
+            onToggleTheme = { previewDarkTheme = !previewDarkTheme }
         )
         return
     }
 
+    val themeViewModel: ThemeViewModel = viewModel(factory = ThemeViewModel.Factory)
     val viewModel: HomeDashboardViewModel = viewModel(factory = HomeDashboardViewModel.Factory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val themeState by themeViewModel.isDarkTheme.collectAsStateWithLifecycle()
     HomeGreetingScreen(
         paddingValues = paddingValues,
         uiState = uiState,
-        onStartDaily = onStartDaily
+        onStartDaily = onStartDaily,
+        isDarkTheme = themeState,
+        onToggleTheme = { themeViewModel.toggleTheme() }
     )
 }
 
@@ -220,7 +230,9 @@ private fun HomeGreetingRoute(paddingValues: PaddingValues, onStartDaily: () -> 
 private fun HomeGreetingScreen(
     paddingValues: PaddingValues,
     uiState: HomeDashboardUiState,
-    onStartDaily: () -> Unit
+    onStartDaily: () -> Unit,
+    isDarkTheme: Boolean,
+    onToggleTheme: () -> Unit
 ) {
 
     Column(
@@ -241,19 +253,27 @@ private fun HomeGreetingScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = "Alex", color = MaterialTheme.colorScheme.onPrimaryContainer, fontSize = 14.sp)
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(text = "今天也一起守护健康", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(text = "晚安好，Alex", style = MaterialTheme.typography.headlineSmall)
-                    Text(text = "周三 · 10月24日", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "Alex", color = MaterialTheme.colorScheme.onPrimaryContainer, fontSize = 14.sp)
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+                        Text(text = "今天也一起守护健康", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = "晚安好，Alex", style = MaterialTheme.typography.headlineSmall)
+                        Text(text = "周三 · 10月24日", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = onToggleTheme) {
+                        Icon(
+                            imageVector = if (isDarkTheme) Icons.Outlined.WbSunny else Icons.Outlined.Nightlight,
+                            contentDescription = if (isDarkTheme) "切换到日间" else "切换到夜间"
+                        )
+                    }
                 }
             }
         }

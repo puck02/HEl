@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
 import com.heldairy.core.preferences.AiPreferencesStore
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -21,6 +22,19 @@ class ThemeViewModel(private val preferencesStore: AiPreferencesStore) : ViewMod
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = false
         )
+
+    fun toggleTheme() {
+        val next = !isDarkTheme.value
+        viewModelScope.launch {
+            preferencesStore.updateThemeDark(next)
+        }
+    }
+
+    fun setTheme(dark: Boolean) {
+        viewModelScope.launch {
+            preferencesStore.updateThemeDark(dark)
+        }
+    }
 
     companion object {
         val Factory = viewModelFactory {
