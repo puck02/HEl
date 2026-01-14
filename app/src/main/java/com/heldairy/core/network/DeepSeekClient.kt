@@ -2,6 +2,7 @@ package com.heldairy.core.network
 
 import android.util.Log
 import com.heldairy.core.data.AdvicePayload
+import com.heldairy.core.data.AiFollowUpQuestionDto
 import java.security.MessageDigest
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -38,6 +39,28 @@ class DeepSeekClient(
         return parseAdvicePayload(rawContent)
     }
 
+    suspend fun fetchFollowUpQuestions(
+        apiKey: String,
+        model: String,
+        systemPrompt: String,
+        userPrompt: String
+    ): List<AiFollowUpQuestionDto> {
+        val request = DeepSeekRequest(
+            model = model,
+            messages = listOf(
+                DeepSeekMessage(role = "system", content = systemPrompt),
+                DeepSeekMessage(role = "user", content = userPrompt)
+            )
+        )
+        val response = api.createChatCompletion(
+            authHeader = "Bearer $apiKey",
+            request = request
+        )
+        val rawContent = response.choices.firstOrNull()?.message?.content
+            ?: throw AdvicePayloadFormatException("AI 没有返回任何内容")
+        return parseFollowUpPayload(rawContent)
+    }
+
     private fun parseAdvicePayload(content: String): AdvicePayload {
         val sanitized = extractJsonBlock(content)
             ?: throw AdvicePayloadFormatException("AI 返回格式不正确，请重试。")
@@ -59,6 +82,36 @@ class DeepSeekClient(
         )
         debugLogStructure(sanitized)
         return payload
+    }
+
+    private fun parseFollowUpPayload(content: String): List<AiFollowUpQuestionDto> {
+        val sanitized = extractJsonBlock(content)
+            ?: throw AdvicePayloadFormatException("AI 返回格式不正确，请重试。")
+        logPayloadMeta(sanitized)
+        val root = runCatching { json.parseToJsonElement(sanitized) }.getOrElse {
+            throw AdvicePayloadFormatException("AI 返回格式不正确，请重试。")
+        }
+        val items = when (root) {
+            is JsonArray -> root
+            is JsonObject -> (root["questions"] as? JsonArray)
+            else -> null
+        } ?: throw AdvicePayloadFormatException("AI 返回格式不正确，请重试。")
+
+        val parsed = items.mapNotNull { element ->
+            (element as? JsonObject)?.let { obj ->
+                val text = obj.extractString("text") ?: return@mapNotNull null
+                val type = obj.extractString("type") ?: return@mapNotNull null
+                val options = obj.extractStringList("options")
+                AiFollowUpQuestionDto(
+                    id = obj.extractString("id"),
+                    text = text,
+                    type = type,
+                    options = options
+                )
+            }
+        }
+        if (parsed.isEmpty()) throw AdvicePayloadFormatException("AI 返回格式不正确，请重试。")
+        return parsed
     }
 
     private fun extractJsonBlock(content: String): String? {
@@ -154,6 +207,9 @@ class DeepSeekClient(
             else -> null
         }
     }
+
+    private fun JsonObject.extractString(key: String): String? =
+        (this[key] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
 
     companion object {
         private const val TAG = "DeepSeekClient"

@@ -2,7 +2,8 @@ package com.heldairy.feature.report.model
 
 enum class DailyQuestionStep(val index: Int, val title: String, val subtitle: String) {
     Greeting(0, "Step 0 · 问候", "先了解你今天的整体感受"),
-    Baseline(1, "Step 1 · 基础记录", "用 1～2 分钟完成今日基础数据")
+    Baseline(1, "Step 1 · 基础记录", "用 1～2 分钟完成今日基础数据"),
+    FollowUp(2, "Step 2 · 追问", "根据症状补充几个问题")
 }
 
 data class QuestionOption(

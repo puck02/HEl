@@ -2,6 +2,7 @@ package com.heldairy.core.di
 
 import android.content.Context
 import com.heldairy.core.data.DailyAdviceCoordinator
+import com.heldairy.core.data.AiFollowUpCoordinator
 import com.heldairy.core.data.DailyReportRepository
 import com.heldairy.core.data.DailySummaryManager
 import com.heldairy.core.database.DailyReportDatabase
@@ -20,6 +21,7 @@ interface AppContainer {
     val dailyReportRepository: DailyReportRepository
     val dailySummaryManager: DailySummaryManager
     val adviceCoordinator: DailyAdviceCoordinator
+    val followUpCoordinator: AiFollowUpCoordinator
     val aiPreferencesStore: AiPreferencesStore
 }
 
@@ -60,6 +62,11 @@ class AppContainerImpl(context: Context) : AppContainer {
     override val adviceCoordinator: DailyAdviceCoordinator = DailyAdviceCoordinator(
         repository = dailyReportRepository,
         summaryManager = dailySummaryManager,
+        preferencesStore = aiPreferencesStore,
+        deepSeekClient = deepSeekClient
+    )
+
+    override val followUpCoordinator: AiFollowUpCoordinator = AiFollowUpCoordinator(
         preferencesStore = aiPreferencesStore,
         deepSeekClient = deepSeekClient
     )

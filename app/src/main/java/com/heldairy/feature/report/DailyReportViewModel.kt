@@ -8,16 +8,22 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
 import com.heldairy.core.data.AdvicePayload
 import com.heldairy.core.data.AdviceSource
+import com.heldairy.core.data.AiFollowUpCoordinator
 import com.heldairy.core.data.DailyAdviceCoordinator
 import com.heldairy.core.data.DailyAnswerRecord
 import com.heldairy.core.data.DailyReportRepository
 import com.heldairy.core.data.DailySummaryManager
+import com.heldairy.core.data.TrendFlag
 import com.heldairy.core.database.entity.DailyEntrySnapshot
+import com.heldairy.core.database.entity.DailyEntryWithResponses
 import com.heldairy.feature.report.model.DailyAnswerPayload
 import com.heldairy.feature.report.model.DailyQuestion
 import com.heldairy.feature.report.model.DailyQuestionBank
 import com.heldairy.feature.report.model.DailyQuestionStep
+import com.heldairy.feature.report.model.FollowUpRuleEngine
 import com.heldairy.feature.report.model.QuestionKind
+import com.heldairy.feature.report.model.QuestionOption
+import com.heldairy.feature.report.model.AiFollowUpPromptBuilder
 import com.heldairy.core.preferences.AiPreferencesStore
 import com.heldairy.core.preferences.AiSettings
 import java.time.Clock
@@ -39,17 +45,22 @@ class DailyReportViewModel(
     private val repository: DailyReportRepository,
     private val summaryManager: DailySummaryManager,
     private val adviceCoordinator: DailyAdviceCoordinator,
+    private val followUpCoordinator: AiFollowUpCoordinator,
     private val aiPreferencesStore: AiPreferencesStore,
     private val clock: Clock = Clock.systemDefaultZone(),
     private val json: Json = Json { ignoreUnknownKeys = true }
 ) : ViewModel() {
 
-    private val questions = DailyQuestionBank.questions.sortedBy { it.order }
-    private val questionById = questions.associateBy { it.id }
+    private val baseQuestions = DailyQuestionBank.questions.sortedBy { it.order }
+    private val baseQuestionById = baseQuestions.associateBy { it.id }
 
     private val answers = MutableStateFlow<Map<String, DailyAnswerPayload>>(emptyMap())
     private val sliderDrafts = MutableStateFlow<Map<String, Int>>(emptyMap())
     private val textDrafts = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val recentTrends = MutableStateFlow<Map<String, TrendFlag>>(emptyMap())
+    private val aiFollowUps = MutableStateFlow<List<DailyQuestion>>(emptyList())
+    private var aiFollowUpRequested = false
+    private var latestSettings: AiSettings = AiSettings(apiKey = "", aiEnabled = true)
 
     private val _uiState = MutableStateFlow(DailyReportUiState())
     val uiState: StateFlow<DailyReportUiState> = _uiState.asStateFlow()
@@ -63,10 +74,11 @@ class DailyReportViewModel(
     init {
         refreshUi()
         observeSnapshots()
+        preloadRecentTrends()
     }
 
     fun onOptionSelected(questionId: String, optionId: String) {
-        val question = questionById[questionId] ?: return
+        val question = findQuestion(questionId) ?: return
         val didUpdate = when (val kind = question.kind) {
             is QuestionKind.SingleChoice -> {
                 answers.update { current -> current + (questionId to DailyAnswerPayload.Choice(optionId)) }
@@ -105,7 +117,7 @@ class DailyReportViewModel(
     }
 
     fun onSliderValueChanged(questionId: String, value: Float) {
-        val question = questionById[questionId] ?: return
+        val question = findQuestion(questionId) ?: return
         val sliderKind = question.kind as? QuestionKind.Slider ?: return
         val coerced = value.roundToInt().coerceIn(sliderKind.valueRange.first, sliderKind.valueRange.last)
         sliderDrafts.update { current -> current + (questionId to coerced) }
@@ -119,7 +131,7 @@ class DailyReportViewModel(
     }
 
     fun onTextChanged(questionId: String, text: String) {
-        val question = questionById[questionId] ?: return
+        val question = findQuestion(questionId) ?: return
         val textKind = question.kind as? QuestionKind.TextInput ?: return
         val clipped = text.take(textKind.maxLength)
         textDrafts.update { current -> current + (questionId to clipped) }
@@ -142,7 +154,7 @@ class DailyReportViewModel(
             val now = Instant.now(clock)
             val entryDate = LocalDate.now(clock).toString()
             val timezoneId = clock.zone.id
-            val answerRecords = questions.mapNotNull { question ->
+            val answerRecords = buildQuestionList(answersSnapshot).mapNotNull { question ->
                 val answer = answersSnapshot[question.id] ?: return@mapNotNull null
                 question.toAnswerRecord(answer)
             }
@@ -196,6 +208,7 @@ class DailyReportViewModel(
                 aiPreferencesStore.settingsFlow
             ) { snapshot, settings -> snapshot to settings }
                 .collect { (snapshot, settings) ->
+                    latestSettings = settings
                     updateAdviceSnapshot(snapshot, settings)
                 }
         }
@@ -258,7 +271,8 @@ class DailyReportViewModel(
         val answersSnapshot = answers.value
         val sliderSnapshot = sliderDrafts.value
         val textSnapshot = textDrafts.value
-        questions.forEach { question ->
+        val allQuestions = buildQuestionList(answersSnapshot)
+        allQuestions.forEach { question ->
             val answer = answersSnapshot[question.id]
             val isAnswered = isQuestionAnswered(question, answer)
             val isVisible = allowNext
@@ -324,6 +338,8 @@ class DailyReportViewModel(
             canSubmit = canSubmit,
             isSaving = isSaving
         )
+
+        maybeRequestAiFollowUps(canSubmit)
     }
 
     private fun isQuestionAnswered(question: DailyQuestion, answer: DailyAnswerPayload?): Boolean {
@@ -403,6 +419,97 @@ class DailyReportViewModel(
         }
     }
 
+    private fun preloadRecentTrends() {
+        viewModelScope.launch {
+            val entries = repository.loadRecentEntries(limit = 3)
+            val trends = computeTrends(entries)
+            recentTrends.value = trends
+        }
+    }
+
+    private fun computeTrends(entries: List<DailyEntryWithResponses>): Map<String, TrendFlag> {
+        if (entries.isEmpty()) return emptyMap()
+        val valuesByQuestion = mutableMapOf<String, MutableList<Double>>()
+        entries.forEach { entry ->
+            entry.responses.forEach { response ->
+                val value = response.answerValue.toDoubleOrNull() ?: return@forEach
+                valuesByQuestion.getOrPut(response.questionId) { mutableListOf() }.add(value)
+            }
+        }
+        return valuesByQuestion.mapValues { (_, values) ->
+            if (values.size < 2) {
+                TrendFlag.stable
+            } else {
+                val recent = values.first()
+                val avgRest = values.drop(1).average()
+                val delta = recent - avgRest
+                when {
+                    delta >= 1.0 -> TrendFlag.rising
+                    delta <= -1.0 -> TrendFlag.falling
+                    else -> TrendFlag.stable
+                }
+            }
+        }
+    }
+
+    private fun buildQuestionList(answersSnapshot: Map<String, DailyAnswerPayload>): List<DailyQuestion> {
+        val followUps = FollowUpRuleEngine.evaluate(
+            answers = answersSnapshot,
+            trends = recentTrends.value
+        )
+        val aiQuestions = aiFollowUps.value
+        return (baseQuestions + followUps + aiQuestions).sortedBy { it.order }
+    }
+
+    private fun findQuestion(questionId: String): DailyQuestion? {
+        return _uiState.value.questions.firstOrNull { it.question.id == questionId }?.question
+            ?: baseQuestionById[questionId]
+            ?: FollowUpRuleEngine.findQuestionById(questionId)
+    }
+
+    private fun maybeRequestAiFollowUps(canSubmit: Boolean) {
+        if (aiFollowUpRequested) return
+        if (!canSubmit) return
+        if (!latestSettings.aiEnabled || latestSettings.apiKey.isBlank()) return
+        aiFollowUpRequested = true
+        viewModelScope.launch {
+            val prompt = AiFollowUpPromptBuilder.buildPrompt(
+                answers = answers.value,
+                trends = recentTrends.value
+            )
+            val result = followUpCoordinator.fetchFollowUps(prompt)
+            val questions = result.getOrElse { emptyList() }
+            val mapped = mapAiQuestions(questions)
+            aiFollowUps.value = mapped
+            refreshUi()
+        }
+    }
+
+    private fun mapAiQuestions(dtos: List<com.heldairy.core.data.AiFollowUpQuestionDto>): List<DailyQuestion> {
+        if (dtos.isEmpty()) return emptyList()
+        val existingIds = (baseQuestions + FollowUpRuleEngine.evaluate(answers.value, recentTrends.value)).map { it.id }.toSet()
+        val existingTitles = (baseQuestions + FollowUpRuleEngine.evaluate(answers.value, recentTrends.value)).map { it.title }.toSet()
+        return dtos.mapIndexedNotNull { index, dto ->
+            if (!dto.type.equals("single_choice", ignoreCase = true)) return@mapIndexedNotNull null
+            val options = dto.options?.filter { it.isNotBlank() } ?: emptyList()
+            if (options.isEmpty()) return@mapIndexedNotNull null
+            val safeId = (dto.id?.takeIf { it.isNotBlank() } ?: "ai_fu_${index}").take(64)
+            if (existingIds.contains(safeId)) return@mapIndexedNotNull null
+            if (existingTitles.contains(dto.text)) return@mapIndexedNotNull null
+            DailyQuestion(
+                id = safeId,
+                title = dto.text,
+                prompt = dto.text,
+                step = DailyQuestionStep.FollowUp,
+                order = 200 + index,
+                required = true,
+                kind = QuestionKind.SingleChoice(
+                    options = options.map { opt -> QuestionOption(id = opt.take(50), label = opt) }
+                )
+            )
+        }
+    }
+
     companion object {
         val Factory = viewModelFactory {
             initializer {
@@ -412,6 +519,7 @@ class DailyReportViewModel(
                     repository = container.dailyReportRepository,
                     summaryManager = container.dailySummaryManager,
                     adviceCoordinator = container.adviceCoordinator,
+                    followUpCoordinator = container.followUpCoordinator,
                     aiPreferencesStore = container.aiPreferencesStore
                 )
             }
