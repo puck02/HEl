@@ -5,6 +5,7 @@ import com.heldairy.core.data.DailyAdviceCoordinator
 import com.heldairy.core.data.AiFollowUpCoordinator
 import com.heldairy.core.data.DailyReportRepository
 import com.heldairy.core.data.DailySummaryManager
+import com.heldairy.core.data.BackupManager
 import com.heldairy.core.database.DailyReportDatabase
 import com.heldairy.core.network.DeepSeekApi
 import com.heldairy.core.network.DeepSeekClient
@@ -22,6 +23,7 @@ interface AppContainer {
     val dailySummaryManager: DailySummaryManager
     val adviceCoordinator: DailyAdviceCoordinator
     val followUpCoordinator: AiFollowUpCoordinator
+    val backupManager: BackupManager
     val aiPreferencesStore: AiPreferencesStore
 }
 
@@ -69,5 +71,10 @@ class AppContainerImpl(context: Context) : AppContainer {
     override val followUpCoordinator: AiFollowUpCoordinator = AiFollowUpCoordinator(
         preferencesStore = aiPreferencesStore,
         deepSeekClient = deepSeekClient
+    )
+
+    override val backupManager: BackupManager = BackupManager(
+        repository = dailyReportRepository,
+        json = json
     )
 }

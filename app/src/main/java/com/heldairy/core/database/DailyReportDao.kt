@@ -68,4 +68,20 @@ interface DailyReportDao {
     @Transaction
     @Query("SELECT * FROM daily_entries WHERE id = :entryId LIMIT 1")
     suspend fun getEntryWithResponses(entryId: Long): DailyEntryWithResponses?
+
+    @Transaction
+    @Query("SELECT * FROM daily_entries ORDER BY created_at DESC")
+    suspend fun loadAllSnapshots(): List<DailyEntrySnapshot>
+
+    @Query("DELETE FROM daily_advice")
+    suspend fun clearAdvice()
+
+    @Query("DELETE FROM daily_summaries")
+    suspend fun clearSummaries()
+
+    @Query("DELETE FROM question_responses")
+    suspend fun clearResponses()
+
+    @Query("DELETE FROM daily_entries")
+    suspend fun clearEntries()
 }

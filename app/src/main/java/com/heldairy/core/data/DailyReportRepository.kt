@@ -63,6 +63,17 @@ class DailyReportRepository(
         dailyReportDao.getEntryWithResponses(entryId)
     }
 
+    suspend fun loadAllSnapshots(): List<DailyEntrySnapshot> = withContext(ioDispatcher) {
+        dailyReportDao.loadAllSnapshots()
+    }
+
+    suspend fun clearAll() = withContext(ioDispatcher) {
+        dailyReportDao.clearAdvice()
+        dailyReportDao.clearSummaries()
+        dailyReportDao.clearResponses()
+        dailyReportDao.clearEntries()
+    }
+
     suspend fun saveSummary(summary: DailySummaryEntity) = withContext(ioDispatcher) {
         dailyReportDao.upsertSummary(summary)
     }

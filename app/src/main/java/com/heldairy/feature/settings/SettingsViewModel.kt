@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
+import com.heldairy.core.data.BackupManager
 import com.heldairy.core.preferences.AiPreferencesStore
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +19,8 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
 
 class SettingsViewModel(
-    private val preferencesStore: AiPreferencesStore
+    private val preferencesStore: AiPreferencesStore,
+    private val backupManager: BackupManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -70,11 +72,32 @@ class SettingsViewModel(
         }
     }
 
+    suspend fun exportJson(): Result<String> {
+        return runCatching { backupManager.exportJson() }
+    }
+
+    suspend fun exportCsv(): Result<String> {
+        return runCatching { backupManager.exportCsv() }
+    }
+
+    suspend fun importJson(raw: String): Result<Unit> {
+        return backupManager.importJson(raw)
+    }
+
+    fun showMessage(message: String) {
+        viewModelScope.launch {
+            _events.emit(SettingsEvent.Snackbar(message))
+        }
+    }
+
     companion object {
         val Factory = viewModelFactory {
             initializer {
                 val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HElDairyApplication)
-                SettingsViewModel(app.container.aiPreferencesStore)
+                SettingsViewModel(
+                    preferencesStore = app.container.aiPreferencesStore,
+                    backupManager = app.container.backupManager
+                )
             }
         }
     }
