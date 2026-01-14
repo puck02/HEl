@@ -60,7 +60,7 @@ class DailyReportViewModel(
     private val recentTrends = MutableStateFlow<Map<String, TrendFlag>>(emptyMap())
     private val aiFollowUps = MutableStateFlow<List<DailyQuestion>>(emptyList())
     private var aiFollowUpRequested = false
-    private var latestSettings: AiSettings = AiSettings(apiKey = "", aiEnabled = true)
+    private var latestSettings: AiSettings = AiSettings(apiKey = "", aiEnabled = true, themeDark = false)
 
     private val _uiState = MutableStateFlow(DailyReportUiState())
     val uiState: StateFlow<DailyReportUiState> = _uiState.asStateFlow()

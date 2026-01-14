@@ -131,6 +131,7 @@ fun SettingsRoute(
             onSaveApiKey = viewModel::saveApiKey,
             onClearApiKey = viewModel::clearApiKey,
             onAiEnabledChanged = viewModel::onAiEnabledChanged,
+            onThemeChanged = viewModel::onThemeChanged,
             onExportJson = { exportJsonLauncher.launch(defaultBackupFileName("json")) },
             onExportCsv = { exportCsvLauncher.launch(defaultBackupFileName("csv")) },
             onImportJson = { importJsonLauncher.launch("application/json") },
@@ -148,6 +149,7 @@ fun SettingsScreen(
     onSaveApiKey: () -> Unit,
     onClearApiKey: () -> Unit,
     onAiEnabledChanged: (Boolean) -> Unit,
+    onThemeChanged: (Boolean) -> Unit,
     onExportJson: () -> Unit,
     onExportCsv: () -> Unit,
     onImportJson: () -> Unit,
@@ -165,6 +167,13 @@ fun SettingsScreen(
             Switch(
                 checked = state.aiEnabled,
                 onCheckedChange = onAiEnabledChanged
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(text = "夜间模式")
+            Switch(
+                checked = state.isDarkTheme,
+                onCheckedChange = onThemeChanged
             )
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

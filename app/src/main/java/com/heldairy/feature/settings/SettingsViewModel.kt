@@ -37,7 +37,8 @@ class SettingsViewModel(
                     current.copy(
                         lastSavedApiKey = settings.apiKey,
                         apiKeyInput = if (isDirty) current.apiKeyInput else settings.apiKey,
-                        aiEnabled = settings.aiEnabled
+                        aiEnabled = settings.aiEnabled,
+                        isDarkTheme = settings.themeDark
                     )
                 }
             }
@@ -62,6 +63,13 @@ class SettingsViewModel(
             preferencesStore.updateApiKey(input)
             _uiState.update { it.copy(isSaving = false) }
             _events.emit(SettingsEvent.Snackbar("API Key 已更新"))
+        }
+    }
+
+    fun onThemeChanged(enabled: Boolean) {
+        _uiState.update { it.copy(isDarkTheme = enabled) }
+        viewModelScope.launch {
+            preferencesStore.updateThemeDark(enabled)
         }
     }
 
@@ -107,6 +115,7 @@ data class SettingsUiState(
     val apiKeyInput: String = "",
     val lastSavedApiKey: String = "",
     val aiEnabled: Boolean = true,
+    val isDarkTheme: Boolean = false,
     val isSaving: Boolean = false
 ) {
     val isApiKeyDirty: Boolean get() = apiKeyInput != lastSavedApiKey

@@ -23,7 +23,8 @@ class AiPreferencesStore(context: Context) {
         .map { preferences ->
             AiSettings(
                 apiKey = preferences[API_KEY] ?: "",
-                aiEnabled = preferences[AI_ENABLED] ?: true
+                aiEnabled = preferences[AI_ENABLED] ?: true,
+                themeDark = preferences[THEME_DARK] ?: false
             )
         }
 
@@ -45,13 +46,21 @@ class AiPreferencesStore(context: Context) {
         }
     }
 
+    suspend fun updateThemeDark(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[THEME_DARK] = enabled
+        }
+    }
+
     companion object {
         private val API_KEY = stringPreferencesKey("deepseek_api_key")
         private val AI_ENABLED = booleanPreferencesKey("deepseek_enabled")
+        private val THEME_DARK = booleanPreferencesKey("theme_dark")
     }
 }
 
 data class AiSettings(
     val apiKey: String,
-    val aiEnabled: Boolean
+    val aiEnabled: Boolean,
+    val themeDark: Boolean
 )
