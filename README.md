@@ -1,71 +1,131 @@
+
 # HElDairy — AI 私人健康管家
 
-简体中文说明。该项目实现一个面向 Android（Android 10+）的“AI 私人健康管家”原型：连续式每日健康问诊对话、规则驱动的跟进问题、以及可选的 DeepSeek AI 建议生成功能。
+简介
+---
+HElDairy 是一个面向 Android（Android 10+）的原型应用，目标为提供“生活管家”式的每日健康对话：记录日常指标、按规则触发跟进问题，并在可用时调用 DeepSeek AI 生成个性化建议。项目以本地优先为原则，用户数据默认仅保存在设备上。
 
-核心特性
-- Kotlin + Jetpack Compose (Material 3)
+主要特性
+---
+- 连续式每日问诊对话流程（Step 0–Step 3，参见需求文档）
+- 规则驱动的自适应跟进问题（可序列化的规则树，便于扩展）
+- Kotlin + Jetpack Compose（Material 3）UI
+- Room 持久化层 + ViewModel + StateFlow
+- DeepSeek AI 可选集成（通过 Retrofit + OkHttp + kotlinx.serialization）
+- 本地导出/导入：JSON 备份（含 schemaVersion）与 CSV 医生导出
+
+技术栈
+---
+- 语言：Kotlin
+# HElDairy — AI 私人健康管家
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue.svg)](https://kotlinlang.org/) [![Android](https://img.shields.io/badge/Android-10%2B-brightgreen.svg)](https://developer.android.com)
+
+简介
+---
+HElDairy 是一个面向 Android（Android 10+）的原型应用，提供“生活管家”式的每日健康对话：记录日常指标、按规则触发跟进问题，并在可用时调用 DeepSeek AI 生成非诊断性的生活方式建议。应用以本地优先为原则，用户健康数据默认仅保存在设备上。
+
+目录
+---
+- [主要特性](#主要特性)
+- [技术栈](#技术栈)
+- [文件结构](#文件结构)
+- [快速开始](#快速开始)
+- [构建与测试](#构建与测试)
+- [配置与运行说明](#配置与运行说明)
+- [导出 / 导入](#导出--导入)
+- [里程碑与交付](#里程碑与交付)
+- [贡献](#贡献)
+- [许可](#许可)
+- [鸣谢](#鸣谢)
+
+主要特性
+---
+- 连续式每日问诊对话（Step 0–Step 3，见需求）
+- 规则驱动的自适应跟进问题（可序列化规则树）
+- Kotlin + Jetpack Compose（Material 3）UI
 - Room 持久化 + ViewModel + StateFlow
-- Retrofit/OkHttp + kotlinx.serialization（DeepSeek 与网络层）
-- 可配置的 DeepSeek AI 集成（离线可用、出现异常时回退）
-- 本地导出/导入（JSON 备份 + CSV 医生导出）
+- DeepSeek AI 可选集成（Retrofit + OkHttp + kotlinx.serialization）
+- 本地导出/导入：JSON 备份（含 schemaVersion）与 CSV 医生导出
 
-仓库结构（部分）
-- [app](app)
-- [doc/requirements.md](doc/requirements.md)
-- [dev_logs/2026-01-13.md](dev_logs/2026-01-13.md)
+技术栈
+---
+- 语言：Kotlin
+- UI：Jetpack Compose + Material 3
+- 持久化：Room
+- 网络：Retrofit + OkHttp
+- 序列化：kotlinx.serialization
 
-快速开始（开发者）
+文件结构（示例）
+---
+```
+HEl/
+├── app/
+├── doc/
+│   └── requirements.md
+├── dev_logs/
+├── README.md
+└── LICENSE
+```
 
+快速开始
+---
 先决条件
 - Android Studio（推荐）
 - JDK 17
-- Android SDK（设置 `ANDROID_HOME` 指向你的 SDK 目录）
+- Android SDK（确保 `ANDROID_HOME` 指向 SDK 路径）
 
-示例环境设置（macOS / zsh）
+示例（macOS / zsh）
 ```bash
 export ANDROID_HOME=/Users/you/Library/Android/sdk
-export PATH=$PATH:$ANDROID_HOME/platform-tools
+export PATH=$PATH:$ANDROID_HOME/platform-tools:$PATH
 source ~/.zshrc
 ```
 
-构建与运行
+构建与测试
+---
 ```bash
-# 检查并构建（单模块/单次构建）
+# 清理并构建
 ./gradlew clean build
 
-# 生成调试 APK（M6 要求）
+# 生成调试 APK（用于 M6 交付）
 ./gradlew assembleDebug
 
 # 运行单元测试
 ./gradlew test
 ```
 
-AI Key 与隐私
-- DeepSeek API Key：应用提供设置界面以粘贴/管理 Key（见项目需求）。Key 建议保存在加密的本地存储或偏好设置中，可在设置中禁用 AI 功能而不删除数据。
-- 严格遵守本地优先策略：健康数据不自动同步到云；如 DeepSeek 不可用，界面会显示“AI 建议暂时不可用”，并跳过当次建议生成。
+配置与运行说明
+---
+- DeepSeek API Key：在应用设置中粘贴用户的 DeepSeek Key。建议使用加密的本地存储保存 Key，并提供开关以禁用 AI 功能而不删除本地数据。
+- 离线优先：核心问诊流与数据记录在离线状态下可用；当 DeepSeek 或网络不可用时，AI 建议步骤会被跳过并向用户反馈“AI 建议暂时不可用”。
+
+调试示例
+---
+```bash
+./gradlew installDebug
+adb logcat -s HElDairy:V
+```
 
 导出 / 导入
-- 支持通过 Storage Access Framework 导出 JSON 备份（包含 `schemaVersion` 与完整记录）以及 CSV 医生导出。
-- 导入 JSON 时会在验证 schema 后进行覆盖式恢复。
+---
+- 支持通过 Storage Access Framework 导出完整 JSON 备份（包含 `schemaVersion`）以及 CSV 导出。
+- 导入 JSON 前会进行 schema 验证；验证失败将返回错误，避免伪造或不完整的数据导入。
 
-里程碑与交付（参见详细需求）
-- 本项目按照 M0–M6 里程碑开发；每完成一项里程碑请运行 `./gradlew build` 验证。
-- 详见 [doc/requirements.md](doc/requirements.md)
-
-开发提示与约束
-- 网络层：使用 Retrofit + OkHttp 拦截器注入鉴权头并记录请求（生产中应屏蔽或脱敏日志）。
-- 规则树：症状跟进以可序列化的数据结构（sealed class 或 JSON 资产）实现，便于扩展而不改动业务逻辑。
-- 测试优先：为自适应触发器与 JSON 验证器编写单元测试。
 
 贡献
-- 请参考项目代码风格并在提交前运行 `./gradlew build`。
+---
+1. Fork 本仓库
+2. 创建分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改并推送 (`git commit -m "Add feature" && git push`)
+4. 打开 Pull Request
 
-参考与文档
-- 需求说明：[doc/requirements.md](doc/requirements.md)
-- 开发日志：[dev_logs/2026-01-13.md](dev_logs/2026-01-13.md)
+请在提交重大变更前先在 Issue 中讨论设计。
 
 许可
-- 参见仓库根目录的 `LICENSE` 文件。
+---
+本项目采用 MIT 许可 — 详见仓库根目录的 `LICENSE` 文件。
 
-——
-README 文件已根据仓库内需求与开发说明编写。如需加入更多使用示例、屏幕截图或发布说明，请告诉我要补充的内容。
+鸣谢
+---
+
