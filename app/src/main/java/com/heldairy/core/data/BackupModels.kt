@@ -5,8 +5,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class BackupPayload(
-    @SerialName("schema_version") val schemaVersion: Int = 1,
-    val entries: List<BackupEntry>
+    @SerialName("schema_version") val schemaVersion: Int = 2,
+    val entries: List<BackupEntry>,
+    val insights: List<BackupInsight> = emptyList()
 )
 
 @Serializable
@@ -44,4 +45,16 @@ data class BackupSummary(
     @SerialName("window_7_json") val window7Json: String?,
     @SerialName("window_30_json") val window30Json: String?,
     @SerialName("computed_at") val computedAt: Long
+)
+
+@Serializable
+data class BackupInsight(
+    @SerialName("week_start_date") val weekStartDate: String,
+    @SerialName("week_end_date") val weekEndDate: String,
+    @SerialName("generated_at") val generatedAt: Long,
+    @SerialName("window_7_json") val window7Json: String?,
+    @SerialName("window_30_json") val window30Json: String?,
+    @SerialName("ai_result_json") val aiResultJson: String?,
+    val status: String,
+    @SerialName("error_message") val errorMessage: String? = null
 )

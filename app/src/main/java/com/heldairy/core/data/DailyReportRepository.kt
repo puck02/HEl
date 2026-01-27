@@ -70,6 +70,7 @@ class DailyReportRepository(
     suspend fun clearAll() = withContext(ioDispatcher) {
         dailyReportDao.clearAdvice()
         dailyReportDao.clearSummaries()
+        dailyReportDao.clearInsights()
         dailyReportDao.clearResponses()
         dailyReportDao.clearEntries()
     }

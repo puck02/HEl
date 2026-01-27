@@ -7,41 +7,41 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
 import com.heldairy.core.preferences.AiPreferencesStore
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
-class ThemeViewModel(private val preferencesStore: AiPreferencesStore) : ViewModel() {
+class ThemeViewModel(
+	private val preferencesStore: AiPreferencesStore
+) : ViewModel() {
 
-    val isDarkTheme: StateFlow<Boolean> = preferencesStore.settingsFlow
-        .map { it.themeDark }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = false
-        )
+	private val _isDarkTheme = MutableStateFlow(false)
+	val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
 
-    fun toggleTheme() {
-        val next = !isDarkTheme.value
-        viewModelScope.launch {
-            preferencesStore.updateThemeDark(next)
-        }
-    }
+	init {
+		viewModelScope.launch {
+			preferencesStore.settingsFlow.collectLatest { settings ->
+				_isDarkTheme.value = settings.themeDark
+			}
+		}
+	}
 
-    fun setTheme(dark: Boolean) {
-        viewModelScope.launch {
-            preferencesStore.updateThemeDark(dark)
-        }
-    }
+	fun toggleTheme() {
+		viewModelScope.launch {
+			val next = !_isDarkTheme.value
+			_isDarkTheme.value = next
+			preferencesStore.updateThemeDark(next)
+		}
+	}
 
-    companion object {
-        val Factory = viewModelFactory {
-            initializer {
-                val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HElDairyApplication)
-                ThemeViewModel(app.container.aiPreferencesStore)
-            }
-        }
-    }
+	companion object {
+		val Factory = viewModelFactory {
+			initializer {
+				val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HElDairyApplication)
+				ThemeViewModel(preferencesStore = app.container.aiPreferencesStore)
+			}
+		}
+	}
 }

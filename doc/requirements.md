@@ -157,7 +157,7 @@ M5：迁移与导出
 - ./gradlew build 通过
 
 M6：打包交付
-- ./gradlew assembleDebug
+- ./gradaslew sembleDebug
 - README：安装、迁移、API Key 设置说明
 
 

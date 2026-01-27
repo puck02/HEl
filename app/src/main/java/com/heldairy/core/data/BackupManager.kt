@@ -5,19 +5,22 @@ import com.heldairy.core.database.entity.DailyEntryEntity
 import com.heldairy.core.database.entity.DailyEntrySnapshot
 import com.heldairy.core.database.entity.DailySummaryEntity
 import com.heldairy.core.database.entity.QuestionResponseEntity
+import com.heldairy.core.database.entity.InsightReportEntity
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 class BackupManager(
     private val repository: DailyReportRepository,
+    private val insightRepository: InsightRepository,
     private val json: Json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 ) {
     suspend fun exportJson(): String {
         val snapshots = repository.loadAllSnapshots()
         val payload = BackupPayload(
             schemaVersion = SCHEMA_VERSION,
-            entries = snapshots.map { it.toBackupEntry() }
+            entries = snapshots.map { it.toBackupEntry() },
+            insights = insightRepository.loadAllInsights().map { it.toBackupInsight() }
         )
         return json.encodeToString(payload)
     }
@@ -30,7 +33,7 @@ class BackupManager(
     suspend fun importJson(raw: String): Result<Unit> {
         return runCatching {
             val payload = json.decodeFromString<BackupPayload>(raw)
-            if (payload.schemaVersion != SCHEMA_VERSION) {
+            if (payload.schemaVersion !in supportedSchemas) {
                 throw IllegalArgumentException("不支持的备份版本: ${payload.schemaVersion}")
             }
             repository.clearAll()
@@ -64,6 +67,20 @@ class BackupManager(
                         )
                     )
                 }
+            }
+            payload.insights.forEach { insight ->
+                insightRepository.restoreInsight(
+                    InsightReportEntity(
+                        weekStartDate = insight.weekStartDate,
+                        weekEndDate = insight.weekEndDate,
+                        generatedAt = insight.generatedAt,
+                        window7Json = insight.window7Json,
+                        window30Json = insight.window30Json,
+                        aiResultJson = insight.aiResultJson,
+                        status = insight.status,
+                        errorMessage = insight.errorMessage
+                    )
+                )
             }
         }
     }
@@ -116,7 +133,8 @@ class BackupManager(
     }
 
     companion object {
-        private const val SCHEMA_VERSION = 1
+        private const val SCHEMA_VERSION = 2
+        private val supportedSchemas = setOf(1, 2)
     }
 }
 
@@ -155,4 +173,17 @@ internal object CsvExporter {
         val escaped = value.replace("\"", "\"\"")
         return "\"$escaped\""
     }
+}
+
+private fun InsightReportEntity.toBackupInsight(): BackupInsight {
+    return BackupInsight(
+        weekStartDate = weekStartDate,
+        weekEndDate = weekEndDate,
+        generatedAt = generatedAt,
+        window7Json = window7Json,
+        window30Json = window30Json,
+        aiResultJson = aiResultJson,
+        status = status,
+        errorMessage = errorMessage
+    )
 }

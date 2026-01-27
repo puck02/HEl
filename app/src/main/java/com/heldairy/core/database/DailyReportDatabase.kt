@@ -8,15 +8,17 @@ import com.heldairy.core.database.entity.DailyAdviceEntity
 import com.heldairy.core.database.entity.DailyEntryEntity
 import com.heldairy.core.database.entity.DailySummaryEntity
 import com.heldairy.core.database.entity.QuestionResponseEntity
+import com.heldairy.core.database.entity.InsightReportEntity
 
 @Database(
     entities = [
         DailyEntryEntity::class,
         QuestionResponseEntity::class,
         DailyAdviceEntity::class,
-        DailySummaryEntity::class
+        DailySummaryEntity::class,
+        InsightReportEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class DailyReportDatabase : RoomDatabase() {

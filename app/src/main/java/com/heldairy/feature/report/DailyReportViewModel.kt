@@ -430,9 +430,9 @@ class DailyReportViewModel(
     private fun computeTrends(entries: List<DailyEntryWithResponses>): Map<String, TrendFlag> {
         if (entries.isEmpty()) return emptyMap()
         val valuesByQuestion = mutableMapOf<String, MutableList<Double>>()
-        entries.forEach { entry ->
-            entry.responses.forEach { response ->
-                val value = response.answerValue.toDoubleOrNull() ?: return@forEach
+        for (entry in entries) {
+            for (response in entry.responses) {
+                val value = response.answerValue.toDoubleOrNull() ?: continue
                 valuesByQuestion.getOrPut(response.questionId) { mutableListOf() }.add(value)
             }
         }

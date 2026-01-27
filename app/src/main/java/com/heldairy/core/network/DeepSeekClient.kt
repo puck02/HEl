@@ -3,6 +3,7 @@ package com.heldairy.core.network
 import android.util.Log
 import com.heldairy.core.data.AdvicePayload
 import com.heldairy.core.data.AiFollowUpQuestionDto
+import com.heldairy.core.data.WeeklyInsightPayload
 import java.security.MessageDigest
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -61,6 +62,28 @@ class DeepSeekClient(
         return parseFollowUpPayload(rawContent)
     }
 
+    suspend fun fetchWeeklyInsight(
+        apiKey: String,
+        model: String,
+        systemPrompt: String,
+        userPrompt: String
+    ): WeeklyInsightPayload {
+        val request = DeepSeekRequest(
+            model = model,
+            messages = listOf(
+                DeepSeekMessage(role = "system", content = systemPrompt),
+                DeepSeekMessage(role = "user", content = userPrompt)
+            )
+        )
+        val response = api.createChatCompletion(
+            authHeader = "Bearer $apiKey",
+            request = request
+        )
+        val rawContent = response.choices.firstOrNull()?.message?.content
+            ?: throw AdvicePayloadFormatException("AI 没有返回任何内容")
+        return parseWeeklyInsightPayload(rawContent)
+    }
+
     private fun parseAdvicePayload(content: String): AdvicePayload {
         val sanitized = extractJsonBlock(content)
             ?: throw AdvicePayloadFormatException("AI 返回格式不正确，请重试。")
@@ -112,6 +135,27 @@ class DeepSeekClient(
         }
         if (parsed.isEmpty()) throw AdvicePayloadFormatException("AI 返回格式不正确，请重试。")
         return parsed
+    }
+
+    private fun parseWeeklyInsightPayload(content: String): WeeklyInsightPayload {
+        val sanitized = extractJsonBlock(content)
+            ?: throw AdvicePayloadFormatException("AI 返回格式不正确，请重试。")
+        logPayloadMeta(sanitized)
+        val root = runCatching { json.parseToJsonElement(sanitized) }.getOrElse {
+            throw AdvicePayloadFormatException("AI 返回格式不正确，请重试。")
+        } as? JsonObject ?: throw AdvicePayloadFormatException("AI 返回格式不正确，请重试。")
+
+        val payload = WeeklyInsightPayload(
+            schemaVersion = (root["schema_version"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 1,
+            weekStartDate = root.extractString("week_start_date") ?: "",
+            weekEndDate = root.extractString("week_end_date") ?: "",
+            summary = root.extractString("summary") ?: "",
+            highlights = root.extractStringList("highlights"),
+            suggestions = root.extractStringList("suggestions"),
+            cautions = root.extractStringList("cautions"),
+            confidence = root.extractString("confidence") ?: ""
+        )
+        return payload
     }
 
     private fun extractJsonBlock(content: String): String? {

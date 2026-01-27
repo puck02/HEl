@@ -23,13 +23,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Nightlight
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -68,7 +66,6 @@ import com.heldairy.feature.report.DailyReportEvent
 import com.heldairy.feature.report.DailyReportUiState
 import com.heldairy.feature.report.DailyReportViewModel
 import com.heldairy.feature.report.QuestionUiState
-import com.heldairy.feature.report.StepProgress
 import com.heldairy.feature.report.model.QuestionKind
 import kotlinx.coroutines.flow.collectLatest
 import java.time.LocalDateTime
@@ -77,6 +74,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun DailyReportRoute(
     paddingValues: PaddingValues,
+    carePrompt: String,
     modifier: Modifier = Modifier,
     viewModel: DailyReportViewModel = viewModel(factory = DailyReportViewModel.Factory)
 ) {
@@ -102,6 +100,7 @@ fun DailyReportRoute(
         DailyReportScreen(
             state = state,
             adviceState = adviceState,
+            carePrompt = carePrompt,
             onOptionSelected = viewModel::onOptionSelected,
             onSliderValueChange = viewModel::onSliderValueChanged,
             onSliderValueChangeFinished = viewModel::onSliderValueChangeFinished,
@@ -124,6 +123,7 @@ fun DailyReportRoute(
 fun DailyReportScreen(
     state: DailyReportUiState,
     adviceState: AdviceUiState,
+    carePrompt: String,
     onOptionSelected: (String, String) -> Unit,
     onSliderValueChange: (String, Float) -> Unit,
     onSliderValueChangeFinished: (String) -> Unit,
@@ -138,8 +138,7 @@ fun DailyReportScreen(
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        item { DailyHeader() }
-        item { StepProgressSection(state.stepProgress) }
+        item { DailyHeader(carePrompt = carePrompt) }
         itemsIndexed(
             items = state.questions.filter { it.isVisible },
             key = { _, item -> item.question.id }
@@ -174,7 +173,7 @@ fun DailyReportScreen(
 }
 
 @Composable
-private fun DailyHeader() {
+private fun DailyHeader(carePrompt: String) {
     val now = LocalDateTime.now()
     val dateText = now.format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE"))
     val greeting = when (now.hour) {
@@ -214,54 +213,7 @@ private fun DailyHeader() {
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = palette.textPrimary
                 )
-                Text(text = "慢慢来，保持轻松。", style = MaterialTheme.typography.bodySmall, color = palette.textSecondary)
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun StepProgressSection(progress: List<StepProgress>) {
-    val palette = rememberReportPalette()
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "今日流程",
-            style = MaterialTheme.typography.titleMedium,
-            color = palette.textPrimary
-        )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            progress.forEach { step ->
-                AssistChip(
-                    onClick = {},
-                    enabled = false,
-                    leadingIcon = {
-                        if (step.isComplete) {
-                            Icon(
-                                imageVector = Icons.Outlined.CheckCircle,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.tertiary
-                            )
-                        }
-                    },
-                    label = {
-                        Column {
-                            Text(step.step.title, color = palette.textPrimary)
-                            Text(
-                                text = step.step.subtitle,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = palette.textSecondary
-                            )
-                        }
-                    },
-                    colors = AssistChipDefaults.assistChipColors(
-                        disabledContainerColor = if (step.isComplete) {
-                            palette.cardElevated
-                        } else {
-                            palette.card
-                        }
-                    )
-                )
+                Text(text = carePrompt, style = MaterialTheme.typography.bodySmall, color = palette.textSecondary)
             }
         }
     }
@@ -285,7 +237,8 @@ private fun QuestionCard(
     ) {
         Card(
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = palette.card)
+            colors = CardDefaults.cardColors(containerColor = palette.cardElevated),
+            border = BorderStroke(1.dp, palette.cardStroke)
         ) {
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -341,18 +294,18 @@ private fun ChoiceSection(
             FilterChip(
                 selected = option.id == state.selectedOptionId,
                 onClick = { onOptionSelected(state.question.id, option.id) },
-                label = { Text(option.label, color = palette.textPrimary) },
+                    label = { Text(option.label, color = if (option.id == state.selectedOptionId) MaterialTheme.colorScheme.onPrimary else palette.textPrimary) },
                 colors = FilterChipDefaults.filterChipColors(
-                    containerColor = palette.cardElevated,
-                    selectedContainerColor = palette.accentPrimary.copy(alpha = 0.2f),
-                    selectedLabelColor = palette.textPrimary,
-                    disabledContainerColor = palette.card
+                        containerColor = palette.card,
+                        selectedContainerColor = palette.accentPrimary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = palette.card
                 ),
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
                     selected = option.id == state.selectedOptionId,
-                    selectedBorderColor = palette.accentPrimary,
-                    borderColor = palette.chipBorder
+                        selectedBorderColor = palette.accentPrimary,
+                        borderColor = palette.chipBorder
                 )
             )
         }
@@ -374,11 +327,11 @@ private fun MultiChoiceSection(
                 FilterChip(
                     selected = selected,
                     onClick = { onOptionSelected(state.question.id, option.id) },
-                    label = { Text(option.label, color = palette.textPrimary) },
+                    label = { Text(option.label, color = if (selected) MaterialTheme.colorScheme.onPrimary else palette.textPrimary) },
                     colors = FilterChipDefaults.filterChipColors(
-                        containerColor = palette.cardElevated,
-                        selectedContainerColor = palette.accentPrimary.copy(alpha = 0.2f),
-                        selectedLabelColor = palette.textPrimary,
+                        containerColor = palette.card,
+                        selectedContainerColor = palette.accentPrimary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
                         disabledContainerColor = palette.card
                     ),
                     border = FilterChipDefaults.filterChipBorder(
@@ -541,7 +494,7 @@ private fun AdviceSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Step 3 · AI 今日建议",
+                text = "AI 今日建议",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f)
             )
@@ -716,20 +669,22 @@ private fun rememberReportPalette(): ReportPalette {
             textSecondary = Color(0xFF9FB2DA),
             badgeBackground = Color(0xFF4E7DFF).copy(alpha = 0.18f),
             chipBorder = Color(0xFF2C3650),
-            sliderInactive = Color(0xFF1F2740)
+            sliderInactive = Color(0xFF1F2740),
+            cardStroke = Color(0xFF2C3650)
         )
     } else {
         ReportPalette(
-            background = Brush.verticalGradient(listOf(colorScheme.background, colorScheme.surface)),
-            card = colorScheme.surface,
-            cardElevated = colorScheme.surfaceVariant,
+            background = Brush.verticalGradient(listOf(colorScheme.surfaceVariant, colorScheme.surface)),
+            card = colorScheme.surfaceVariant,
+            cardElevated = colorScheme.surfaceVariant.copy(alpha = 0.9f),
             accentPrimary = colorScheme.primary,
             accentSecondary = colorScheme.secondary,
             textPrimary = colorScheme.onSurface,
             textSecondary = colorScheme.onSurfaceVariant,
             badgeBackground = colorScheme.primary.copy(alpha = 0.12f),
             chipBorder = colorScheme.outlineVariant,
-            sliderInactive = colorScheme.surfaceVariant
+            sliderInactive = colorScheme.surfaceVariant,
+            cardStroke = colorScheme.outlineVariant
         )
     }
 }
@@ -744,5 +699,6 @@ private data class ReportPalette(
     val textSecondary: Color,
     val badgeBackground: Color,
     val chipBorder: Color,
-    val sliderInactive: Color
+    val sliderInactive: Color,
+    val cardStroke: Color
 )

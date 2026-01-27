@@ -4,10 +4,41 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Heart base -->
     <path
-        android:fillColor="#4C74F5"
-        android:pathData="M54,12C33.7,12 17.2,27.2 17.2,46c0,12.4 7.2,23.2 18.1,29.1l-4.4,20.9 17-12.2c2,0.3 4,0.5 6.1,0.5 20.3,0 36.8,-15.2 36.8,-34 0,-18.8 -16.5,-34 -36.8,-34z" />
+        android:fillColor="#F47B84"
+        android:strokeColor="#0F2A64"
+        android:strokeWidth="3"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:pathData="M54,18 C48,6 28,8 22,26 C17,41 24,60 54,82 C84,60 91,41 86,26 C80,8 60,6 54,18 Z" />
+
+    <!-- Left shading to echo original gradient -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M40,46h28a2,2 0 0 1 0,4h-28a2,2 0 0 1 0,-4zM40,34h28a2,2 0 0 1 0,4h-28a2,2 0 1 1 0,-4zM40,58h18a2,2 0 0 1 0,4h-18a2,2 0 0 1 0,-4z" />
+        android:fillColor="#E85E70"
+        android:pathData="M54,18 C48,6 28,8 22,26 C17,41 24,60 54,82 L54,18 Z" />
+
+    <!-- ECG line -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#0F2A64"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M16,56 L30,56 L34,48 L42,72 L50,34 L58,72 L66,52 L80,52 L90,52" />
+
+    <!-- HEI lettering -->
+    <path android:fillColor="#0F2A64" android:pathData="M26,94 h6 v12 h-6 z" />
+    <path android:fillColor="#0F2A64" android:pathData="M38,94 h6 v12 h-6 z" />
+    <path android:fillColor="#0F2A64" android:pathData="M32,100 h6 v4 h-6 z" />
+
+    <path android:fillColor="#0F2A64" android:pathData="M50,94 h6 v12 h-6 z" />
+    <path android:fillColor="#0F2A64" android:pathData="M56,94 h10 v4 h-10 z" />
+    <path android:fillColor="#0F2A64" android:pathData="M56,100 h8 v4 h-8 z" />
+    <path android:fillColor="#0F2A64" android:pathData="M56,106 h10 v4 h-10 z" />
+
+    <path android:fillColor="#0F2A64" android:pathData="M74,94 h6 v12 h-6 z" />
+    <path android:fillColor="#0F2A64" android:pathData="M70,94 h14 v4 h-14 z" />
+    <path android:fillColor="#0F2A64" android:pathData="M70,102 h14 v4 h-14 z" />
 </vector>

@@ -7,6 +7,8 @@ import com.heldairy.core.database.entity.DailyEntrySnapshot
 import com.heldairy.core.database.entity.DailyEntryWithResponses
 import com.heldairy.core.database.entity.DailySummaryEntity
 import com.heldairy.core.database.entity.QuestionResponseEntity
+import com.heldairy.core.database.entity.InsightReportEntity
+import java.time.Clock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +26,14 @@ class BackupManagerTest {
     fun exportThenImportRestoresSnapshots() = runBlocking {
         val sourceDao = FakeDailyReportDao()
         val sourceRepo = DailyReportRepository(sourceDao, Dispatchers.Unconfined)
-        val manager = BackupManager(sourceRepo, json)
+        val sourceInsightRepo = InsightRepository(
+            dailyReportRepository = sourceRepo,
+            dao = sourceDao,
+            clock = Clock.systemUTC(),
+            ioDispatcher = Dispatchers.Unconfined,
+            json = json
+        )
+        val manager = BackupManager(sourceRepo, sourceInsightRepo, json)
 
         val entryId = sourceRepo.recordDailyReport(
             entryDate = "2026-01-14",
@@ -71,8 +80,16 @@ class BackupManagerTest {
 
         val exported = manager.exportJson()
 
-        val targetRepo = DailyReportRepository(FakeDailyReportDao(), Dispatchers.Unconfined)
-        val targetManager = BackupManager(targetRepo, json)
+        val targetDao = FakeDailyReportDao()
+        val targetRepo = DailyReportRepository(targetDao, Dispatchers.Unconfined)
+        val targetInsightRepo = InsightRepository(
+            dailyReportRepository = targetRepo,
+            dao = targetDao,
+            clock = Clock.systemUTC(),
+            ioDispatcher = Dispatchers.Unconfined,
+            json = json
+        )
+        val targetManager = BackupManager(targetRepo, targetInsightRepo, json)
 
         val result = targetManager.importJson(exported)
         assertTrue(result.isSuccess)
@@ -95,7 +112,14 @@ class BackupManagerTest {
     fun importClearsExistingDataBeforeRestore() = runBlocking {
         val dao = FakeDailyReportDao()
         val repo = DailyReportRepository(dao, Dispatchers.Unconfined)
-        val manager = BackupManager(repo, json)
+        val insightRepo = InsightRepository(
+            dailyReportRepository = repo,
+            dao = dao,
+            clock = Clock.systemUTC(),
+            ioDispatcher = Dispatchers.Unconfined,
+            json = json
+        )
+        val manager = BackupManager(repo, insightRepo, json)
 
         repo.recordDailyReport(
             entryDate = "2026-01-10",
@@ -150,11 +174,13 @@ private class FakeDailyReportDao : DailyReportDao {
     private val responses = mutableListOf<QuestionResponseEntity>()
     private val advice = mutableListOf<DailyAdviceEntity>()
     private val summaries = mutableListOf<DailySummaryEntity>()
+    private val insights = mutableListOf<InsightReportEntity>()
 
     private var nextEntryId = 1L
     private var nextResponseId = 1L
     private var nextAdviceId = 1L
     private var nextSummaryId = 1L
+    private var nextInsightId = 1L
 
     private val latestEntryFlow = MutableStateFlow<DailyEntryWithResponses?>(null)
     private val latestSnapshotFlow = MutableStateFlow<DailyEntrySnapshot?>(null)
@@ -189,6 +215,12 @@ private class FakeDailyReportDao : DailyReportDao {
         refreshLatest()
     }
 
+    override suspend fun upsertInsight(report: InsightReportEntity) {
+        val insightId = if (report.id == 0L) nextInsightId++ else report.id
+        insights.removeAll { it.weekStartDate == report.weekStartDate }
+        insights += report.copy(id = insightId)
+    }
+
     override suspend fun findEntryIdByDate(entryDate: String): Long? {
         return entries.firstOrNull { it.entryDate == entryDate }?.id
     }
@@ -218,6 +250,18 @@ private class FakeDailyReportDao : DailyReportDao {
         }
     }
 
+    override suspend fun findInsightByWeekStart(weekStart: String): InsightReportEntity? {
+        return insights.firstOrNull { it.weekStartDate == weekStart }
+    }
+
+    override suspend fun latestInsight(): InsightReportEntity? {
+        return insights.maxByOrNull { it.weekEndDate }
+    }
+
+    override suspend fun loadAllInsights(): List<InsightReportEntity> {
+        return insights.sortedByDescending { it.weekEndDate }
+    }
+
     override suspend fun loadAllSnapshots(): List<DailyEntrySnapshot> {
         return entries
             .sortedByDescending { it.createdAt }
@@ -239,6 +283,10 @@ private class FakeDailyReportDao : DailyReportDao {
     override suspend fun clearSummaries() {
         summaries.clear()
         refreshLatest()
+    }
+
+    override suspend fun clearInsights() {
+        insights.clear()
     }
 
     override suspend fun clearResponses() {
