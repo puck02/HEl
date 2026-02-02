@@ -79,7 +79,7 @@ class InsightsViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HElDairyApplication)
-                val container = app.container
+                val container = app.appContainer
                 InsightsViewModel(
                     insightRepository = container.insightRepository,
                     weeklyInsightCoordinator = container.weeklyInsightCoordinator

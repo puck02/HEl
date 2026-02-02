@@ -5,5 +5,5 @@ import com.heldairy.core.di.AppContainer
 import com.heldairy.core.di.AppContainerImpl
 
 class HElDairyApplication : Application() {
-    val container: AppContainer by lazy { AppContainerImpl(this) }
+    val appContainer: AppContainer by lazy { AppContainerImpl(this) }
 }

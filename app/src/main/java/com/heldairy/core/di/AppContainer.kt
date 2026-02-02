@@ -21,6 +21,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
 interface AppContainer {
+    val database: DailyReportDatabase
     val dailyReportRepository: DailyReportRepository
     val dailySummaryManager: DailySummaryManager
     val adviceCoordinator: DailyAdviceCoordinator
@@ -32,7 +33,7 @@ interface AppContainer {
 }
 
 class AppContainerImpl(context: Context) : AppContainer {
-    private val database = DailyReportDatabase.build(context)
+    override val database = DailyReportDatabase.build(context)
     private val json = Json { ignoreUnknownKeys = true }
 
     private val okHttpClient = OkHttpClient.Builder()

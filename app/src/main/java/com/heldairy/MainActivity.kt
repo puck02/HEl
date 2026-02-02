@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.outlined.EventNote
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.Medication
 import androidx.compose.material.icons.outlined.Mood
 import androidx.compose.material.icons.outlined.Nightlight
 import androidx.compose.material.icons.outlined.RunCircle
@@ -80,6 +81,7 @@ import com.heldairy.feature.home.HomeDashboardUiState
 import com.heldairy.feature.home.HomeDashboardViewModel
 import com.heldairy.feature.home.MetricDisplay
 import com.heldairy.feature.insights.ui.InsightsRoute
+import com.heldairy.feature.medication.ui.MedicationListRoute
 import com.heldairy.feature.report.ui.DailyReportRoute
 import com.heldairy.feature.settings.ThemeViewModel
 import com.heldairy.feature.settings.ui.SettingsRoute
@@ -110,6 +112,7 @@ fun HElDairyApp() {
         ConciergeTab("首页", "生活管家陪伴你", Icons.AutoMirrored.Outlined.Chat),
         ConciergeTab("日报", "记录今日状态", Icons.AutoMirrored.Outlined.EventNote),
         ConciergeTab("洞察", "趋势与总结", Icons.AutoMirrored.Outlined.TrendingUp),
+        ConciergeTab("用药", "药品与疗程", Icons.Outlined.Medication),
         ConciergeTab("设置", "偏好与导出", Icons.Outlined.Settings)
     )
 
@@ -176,7 +179,8 @@ fun HElDairyApp() {
                     carePrompt = dailyCarePrompt
                 )
                 2 -> InsightsRoute(paddingValues = innerPadding)
-                3 -> SettingsRoute(paddingValues = innerPadding)
+                3 -> MedicationListRoute(paddingValues = innerPadding)
+                4 -> SettingsRoute(paddingValues = innerPadding)
                 else -> TabContent(
                     paddingValues = innerPadding,
                     content = tabs[selectedIndex].description

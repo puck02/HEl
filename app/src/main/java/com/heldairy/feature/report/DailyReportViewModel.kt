@@ -514,7 +514,7 @@ class DailyReportViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HElDairyApplication)
-                val container = app.container
+                val container = app.appContainer
                 DailyReportViewModel(
                     repository = container.dailyReportRepository,
                     summaryManager = container.dailySummaryManager,

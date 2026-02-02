@@ -40,7 +40,7 @@ class ThemeViewModel(
 		val Factory = viewModelFactory {
 			initializer {
 				val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HElDairyApplication)
-				ThemeViewModel(preferencesStore = app.container.aiPreferencesStore)
+				ThemeViewModel(preferencesStore = app.appContainer.aiPreferencesStore)
 			}
 		}
 	}

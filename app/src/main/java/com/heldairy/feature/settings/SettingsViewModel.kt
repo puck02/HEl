@@ -95,8 +95,8 @@ class SettingsViewModel(
             initializer {
                 val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HElDairyApplication)
                 SettingsViewModel(
-                    preferencesStore = app.container.aiPreferencesStore,
-                    backupManager = app.container.backupManager
+                    preferencesStore = app.appContainer.aiPreferencesStore,
+                    backupManager = app.appContainer.backupManager
                 )
             }
         }
