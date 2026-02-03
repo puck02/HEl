@@ -76,6 +76,8 @@ import com.heldairy.feature.report.model.QuestionKind
 import com.heldairy.ui.theme.Spacing
 import com.heldairy.ui.theme.CornerRadius
 import com.heldairy.ui.theme.Elevation
+import com.heldairy.ui.theme.KittyBackground
+import com.heldairy.ui.theme.BackgroundTheme
 import kotlinx.coroutines.flow.collectLatest
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -102,24 +104,25 @@ fun DailyReportRoute(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
             .padding(paddingValues)
     ) {
-        DailyReportScreen(
-            state = state,
-            adviceState = adviceState,
-            carePrompt = carePrompt,
-            onOptionSelected = viewModel::onOptionSelected,
-            onSliderValueChange = viewModel::onSliderValueChanged,
-            onSliderValueChangeFinished = viewModel::onSliderValueChangeFinished,
-            onTextChanged = viewModel::onTextChanged,
-            onSubmit = viewModel::submitDailyReport,
-            onAdviceRetry = viewModel::refreshAdvice,
-            onToggleAdviceCollapse = viewModel::toggleAdviceCollapse,
-            onMarkAdviceHelpful = viewModel::markCurrentAdviceHelpful,
-            onMarkAdviceNotHelpful = viewModel::markCurrentAdviceNotHelpful,
-            modifier = Modifier.fillMaxSize()
-        )
+        KittyBackground(backgroundRes = BackgroundTheme.DAILY_REPORT) {
+            DailyReportScreen(
+                state = state,
+                adviceState = adviceState,
+                carePrompt = carePrompt,
+                onOptionSelected = viewModel::onOptionSelected,
+                onSliderValueChange = viewModel::onSliderValueChanged,
+                onSliderValueChangeFinished = viewModel::onSliderValueChangeFinished,
+                onTextChanged = viewModel::onTextChanged,
+                onSubmit = viewModel::submitDailyReport,
+                onAdviceRetry = viewModel::refreshAdvice,
+                onToggleAdviceCollapse = viewModel::toggleAdviceCollapse,
+                onMarkAdviceHelpful = viewModel::markCurrentAdviceHelpful,
+                onMarkAdviceNotHelpful = viewModel::markCurrentAdviceNotHelpful,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
@@ -285,7 +288,7 @@ private fun DailyHeader(carePrompt: String) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "$greeting，今天我陪你记录状态。",
+                    text = "$greeting，今天 Kitty 陪你记录状态～",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -641,7 +644,7 @@ private fun AdviceSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "AI 今日建议",
+                text = "Hello Kitty 今日建议",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f)
             )
@@ -653,8 +656,8 @@ private fun AdviceSection(
 
         if (!adviceState.isCollapsed) {
             when {
-                !adviceState.aiEnabled -> AdviceInfoCard("AI 功能已关闭，请在“设置”中开启以获取生活管家建议。")
-                adviceState.apiKeyMissing -> AdviceInfoCard("请在“设置”中填写 DeepSeek API Key，我会立刻为你生成建议。")
+                !adviceState.aiEnabled -> AdviceInfoCard("AI 功能已关闭，请在【设置】中开启，Kitty 就能陪你一起生活啦～")
+                adviceState.apiKeyMissing -> AdviceInfoCard("请在【设置】中填写 DeepSeek API Key，Kitty 会马上为你生成建议哦～")
                 adviceState.isGenerating -> AdviceLoadingCard()
                 adviceState.advice != null -> AdviceResultCard(
                     payload = adviceState.advice,
@@ -666,11 +669,11 @@ private fun AdviceSection(
                     onMarkNotHelpful = onMarkNotHelpful
                 )
                 adviceState.errorMessage != null -> AdviceErrorCard(adviceState.errorMessage, onRetry)
-                else -> AdviceInfoCard("完成基础问题后，我会立刻生成个性化建议。")
+                else -> AdviceInfoCard("完成基础问题后，Kitty 会马上生成个性化建议～")
             }
             if (adviceState.canRequestAdvice) {
                 TextButton(onClick = onRetry, enabled = !adviceState.isGenerating) {
-                    Text("重新生成 AI 建议")
+                    Text("重新生成 Kitty 建议")
                 }
             }
         }
@@ -699,7 +702,7 @@ private fun AdviceLoadingCard() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            Text("AI 正在整理建议，请稍等…")
+            Text("Kitty 正在整理建议，请稍等一下下～")
         }
     }
 }
@@ -749,7 +752,7 @@ private fun AdviceResultCard(
             }
             if (isFallback || payload.source == AdviceSource.FALLBACK) {
                 Text(
-                    text = "AI 建议暂时不可用，以下为基础建议。",
+                    text = "AI 建议暂时不可用，以下是 Kitty 的基础建议～",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.tertiary
                 )
@@ -774,7 +777,7 @@ private fun AdviceResultCard(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "这些建议有帮助吗？",
+                            text = "Kitty 的建议对你有帮助吗～",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

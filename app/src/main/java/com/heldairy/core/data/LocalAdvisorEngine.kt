@@ -66,13 +66,13 @@ class LocalAdvisorEngine {
                     sleepHours < 5f
                 },
                 adviceTemplate = AdvicePayload(
-                    observations = listOf("睡眠时长严重不足（<5小时），身体恢复受限"),
+                    observations = listOf("Kitty 发现你睡眠时间太少啦（不到5小时），身体恢复不过来呢～"),
                     actions = listOf(
-                        "今晚务必提前1小时上床，目标睡足7小时",
-                        "睡前1小时避免屏幕光线，可尝试热水泡脚",
-                        "若持续失眠超过3天，建议咨询医生"
+                        "今晚一定要提前1小时上床哦，咱们争取睡足7小时～",
+                        "睡前1小时就别看手机了～要不要试试泡泡脚，会更舒服～",
+                        "如果连续3天都睡不好，记得去看看医生呀～"
                     ),
-                    tomorrowFocus = listOf("记录实际入睡时间和起床感受"),
+                    tomorrowFocus = listOf("明天告诉 Kitty 你几点睡的、几点起的，感觉怎么样～"),
                     source = AdviceSource.LOCAL
                 )
             ),
@@ -87,12 +87,12 @@ class LocalAdvisorEngine {
                     sleepHours in 5f..6f
                 },
                 adviceTemplate = AdvicePayload(
-                    observations = listOf("睡眠时长略显不足（5-6小时）"),
+                    observations = listOf("Kitty 觉得你睡得有点少呢（5-6小时）～"),
                     actions = listOf(
-                        "今晚尝试提前30分钟上床",
-                        "午休控制在20-30分钟内，避免影响夜间睡眠"
+                        "今晚可以试着提前30分钟上床哦～",
+                        "如果午睡的话，控制在20-30分钟就好，不然晚上会睡不着的～"
                     ),
-                    tomorrowFocus = listOf("观察睡眠时长变化"),
+                    tomorrowFocus = listOf("明天看看睡眠时间有没有改善～"),
                     source = AdviceSource.LOCAL
                 )
             ),
@@ -115,13 +115,13 @@ class LocalAdvisorEngine {
                     todayZero && weekAvgLow
                 },
                 adviceTemplate = AdvicePayload(
-                    observations = listOf("近期运动量明显不足"),
+                    observations = listOf("Kitty 看到你最近运动好少呀～"),
                     actions = listOf(
-                        "从轻度活动开始：饭后散步15-20分钟",
-                        "选择喜欢的活动（游泳、骑行、瑜伽），降低心理负担",
-                        "设定小目标：本周至少运动2次"
+                        "咱们从简单的开始～吃完饭散散步，走个15-20分钟就很棒～",
+                        "选你喜欢的活动就好（游泳、骑车、瑜伽...），开心最重要～",
+                        "给自己定个小目标：这周至少动一动2次～"
                     ),
-                    tomorrowFocus = listOf("记录是否完成运动计划"),
+                    tomorrowFocus = listOf("明天记得告诉 Kitty 有没有完成运动计划哦～"),
                     source = AdviceSource.LOCAL
                 )
             ),
@@ -136,14 +136,14 @@ class LocalAdvisorEngine {
                     painLevel > 7f
                 },
                 adviceTemplate = AdvicePayload(
-                    observations = listOf("疼痛程度较高（>7分），需重点关注"),
+                    observations = listOf("Kitty 看到你的疼痛有点严重呢（超过7分了），要好好关注～"),
                     actions = listOf(
-                        "记录疼痛具体部位和持续时长",
-                        "避免剧烈活动，适当休息",
-                        "可尝试冷敷或热敷缓解（根据疼痛类型选择）"
+                        "记下来疼痛的具体位置和持续了多久～",
+                        "今天先好好休息，别做太剧烈的活动啦～",
+                        "试试冷敷或热敷（根据疼痛类型选），可能会舒服一点～"
                     ),
-                    tomorrowFocus = listOf("观察疼痛是否缓解"),
-                    redFlags = listOf("如疼痛持续加重、伴有发热或活动受限，请及时就医"),
+                    tomorrowFocus = listOf("明天告诉 Kitty 疼痛有没有缓解～"),
+                    redFlags = listOf("如果疼痛一直在加重、还发烧、或者影响活动了，一定要去看医生呀～"),
                     source = AdviceSource.LOCAL
                 )
             ),
@@ -158,14 +158,14 @@ class LocalAdvisorEngine {
                     moodScore < 3f
                 },
                 adviceTemplate = AdvicePayload(
-                    observations = listOf("情绪状态偏低（<3分）"),
+                    observations = listOf("Kitty 感觉到你今天情绪不太好呢（不到3分）～"),
                     actions = listOf(
-                        "尝试进行喜欢的轻度活动（听音乐、看书、晒太阳）",
-                        "与信任的朋友或家人简单聊聊",
-                        "保持规律作息，避免独自长时间封闭"
+                        "做点你喜欢的事情吧～听听音乐、看看书、或者出去晒晒太阳～",
+                        "找个信任的朋友或家人聊聊天，说说话会舒服一点～",
+                        "记得按时睡觉起床，别一个人闷太久哦～"
                     ),
-                    tomorrowFocus = listOf("记录情绪变化和影响因素"),
-                    redFlags = listOf("如情绪持续低落超过2周、出现自伤念头，请寻求专业心理咨询"),
+                    tomorrowFocus = listOf("明天告诉 Kitty 心情有没有好一点，是什么影响了情绪～"),
+                    redFlags = listOf("如果心情低落持续超过2周、或者有自我伤害的念头，一定要找专业的心理咨询师帮忙呀～"),
                     source = AdviceSource.LOCAL
                 )
             ),
@@ -180,13 +180,13 @@ class LocalAdvisorEngine {
                     mealCount < 2f
                 },
                 adviceTemplate = AdvicePayload(
-                    observations = listOf("今日进食不足2餐，营养摄入可能不足"),
+                    observations = listOf("Kitty 发现你今天吃饭太少了（不到2顿），营养可能跟不上呀～"),
                     actions = listOf(
-                        "明日尽量保证三餐规律，即使食欲不佳也建议少量进食",
-                        "准备一些健康零食（坚果、水果）避免长时间空腹",
-                        "保持充足饮水（1500-2000ml/天）"
+                        "明天尽量三餐按时吃哦～就算不太饿也吃一点点～",
+                        "准备些健康小零食（坚果、水果）放在身边，别让自己太饿～",
+                        "记得多喝水呀（一天1500-2000ml）～"
                     ),
-                    tomorrowFocus = listOf("记录三餐时间和食欲变化"),
+                    tomorrowFocus = listOf("明天记录吃饭时间和食欲怎么样～"),
                     source = AdviceSource.LOCAL
                 )
             ),
@@ -201,13 +201,13 @@ class LocalAdvisorEngine {
                     waterIntake < 800f
                 },
                 adviceTemplate = AdvicePayload(
-                    observations = listOf("今日饮水量明显不足（<800ml）"),
+                    observations = listOf("Kitty 看到你今天喝水好少呀（不到800ml）～"),
                     actions = listOf(
-                        "设置饮水提醒：每2小时喝一杯水（约200ml）",
-                        "随身携带水杯，增加饮水便利性",
-                        "可适当饮用温开水、淡茶，避免过多含糖饮料"
+                        "给自己设个喝水提醒吧～每2小时喝一杯（大概200ml）～",
+                        "随身带个水杯，想喝就喝，会方便很多～",
+                        "可以喝温开水或淡茶，尽量少喝含糖饮料哦～"
                     ),
-                    tomorrowFocus = listOf("记录饮水总量"),
+                    tomorrowFocus = listOf("明天记录下总共喝了多少水～"),
                     source = AdviceSource.LOCAL
                 )
             ),
@@ -222,13 +222,13 @@ class LocalAdvisorEngine {
                     sleepQuality < 5f
                 },
                 adviceTemplate = AdvicePayload(
-                    observations = listOf("睡眠质量评分较低（<5分）"),
+                    observations = listOf("Kitty 注意到你睡眠质量不太好呢（不到5分）～"),
                     actions = listOf(
-                        "检查睡眠环境：保持安静、黑暗、温度适宜（18-22℃）",
-                        "睡前避免咖啡因、酒精摄入",
-                        "建立固定睡眠仪式（如冥想、轻音乐）"
+                        "检查一下睡觉的环境～尽量保持安静、黑暗，温度在18-22℃最舒服～",
+                        "睡前别喝咖啡或酒精饮料哦～",
+                        "试试建立睡前小仪式（比如冥想、听轻音乐）～"
                     ),
-                    tomorrowFocus = listOf("观察睡眠质量改善情况"),
+                    tomorrowFocus = listOf("明天看看睡眠质量有没有改善～"),
                     source = AdviceSource.LOCAL
                 )
             )

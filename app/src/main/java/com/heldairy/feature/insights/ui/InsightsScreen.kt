@@ -31,6 +31,8 @@ import com.heldairy.ui.theme.Elevation
 import com.heldairy.ui.theme.success
 import com.heldairy.ui.theme.warning
 import com.heldairy.ui.theme.semanticError
+import com.heldairy.ui.theme.KittyBackground
+import com.heldairy.ui.theme.BackgroundTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.TrendingDown
 import androidx.compose.material.icons.automirrored.outlined.TrendingFlat
@@ -175,15 +177,17 @@ fun InsightsRoute(
 			onDismiss = { viewModel.closePreview() }
 		)
 	} else {
-		InsightsScreen(
-			state = state,
-			onSelectWindow = viewModel::selectWindow,
-			onRetryWeekly = { viewModel.refreshWeekly(force = true) },
-			onGeneratePreview = { viewModel.generatePreview() },
-			onClearReportStatus = viewModel::clearReportStatus,
-			onSetReportDateRange = viewModel::setReportDateRange,
-			modifier = modifier.padding(paddingValues)
-		)
+		KittyBackground(backgroundRes = BackgroundTheme.INSIGHTS) {
+			InsightsScreen(
+				state = state,
+				onSelectWindow = viewModel::selectWindow,
+				onRetryWeekly = { viewModel.refreshWeekly(force = true) },
+				onGeneratePreview = { viewModel.generatePreview() },
+				onClearReportStatus = viewModel::clearReportStatus,
+				onSetReportDateRange = viewModel::setReportDateRange,
+				modifier = modifier.padding(paddingValues)
+			)
+		}
 	}
 }
 

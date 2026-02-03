@@ -28,8 +28,12 @@ import androidx.compose.foundation.verticalScroll
 import com.heldairy.ui.theme.Spacing
 import com.heldairy.ui.theme.CornerRadius
 import com.heldairy.ui.theme.Elevation
+import com.heldairy.ui.theme.KittyBackground
+import com.heldairy.ui.theme.BackgroundTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.ui.res.painterResource
+import com.heldairy.R
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.DeleteSweep
@@ -62,6 +66,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -146,22 +151,24 @@ fun SettingsRoute(
         modifier = modifier.padding(paddingValues),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
-        SettingsScreen(
-            state = uiState,
-            onApiKeyChanged = viewModel::onApiKeyChanged,
-            onSaveApiKey = viewModel::saveApiKey,
-            onClearApiKey = viewModel::clearApiKey,
-            onAiEnabledChanged = viewModel::onAiEnabledChanged,
-            onUserNameChanged = viewModel::onUserNameChanged,
-            onSaveUserName = viewModel::saveUserName,
-            onAvatarSelected = { uri -> viewModel.updateAvatar(uri?.toString()) },
-            onExportJson = { exportJsonLauncher.launch(defaultBackupFileName("json")) },
-            onImportJson = { importJsonLauncher.launch("application/json") },
-            onClearAllData = { viewModel.clearAllData() },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        )
+        KittyBackground(backgroundRes = BackgroundTheme.SETTINGS) {
+            SettingsScreen(
+                state = uiState,
+                onApiKeyChanged = viewModel::onApiKeyChanged,
+                onSaveApiKey = viewModel::saveApiKey,
+                onClearApiKey = viewModel::clearApiKey,
+                onAiEnabledChanged = viewModel::onAiEnabledChanged,
+                onUserNameChanged = viewModel::onUserNameChanged,
+                onSaveUserName = viewModel::saveUserName,
+                onAvatarSelected = { uri -> viewModel.updateAvatar(uri?.toString()) },
+                onExportJson = { exportJsonLauncher.launch(defaultBackupFileName("json")) },
+                onImportJson = { importJsonLauncher.launch("application/json") },
+                onClearAllData = { viewModel.clearAllData() },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            )
+        }
     }
 }
 
@@ -542,11 +549,14 @@ private fun ProfileCard(
                                 contentScale = ContentScale.Crop
                             )
                         } else {
-                            Icon(
-                                imageVector = Icons.Default.Person,
+                            // 使用 Hello Kitty 作为默认头像
+                            Image(
+                                painter = painterResource(id = R.drawable.default_avatar_kitty),
                                 contentDescription = "默认头像",
-                                modifier = Modifier.size(40.dp),
-                                tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
                             )
                         }
                     }

@@ -20,8 +20,8 @@ object FollowUpRuleEngine {
             questions = listOf(
                 DailyQuestion(
                     id = "fu_headache_nature",
-                    title = "头痛特点",
-                    prompt = "帮我判断是紧张型还是偏头痛。",
+                    title = "来～告诉 Kitty 头痛是什么感觉～",
+                    prompt = "我来帮你看看是紧张型还是偏头痛～",
                     step = DailyQuestionStep.FollowUp,
                     order = 100,
                     required = true,
@@ -36,8 +36,8 @@ object FollowUpRuleEngine {
                 ),
                 DailyQuestion(
                     id = "fu_headache_pattern",
-                    title = "持续与诱因",
-                    prompt = "想了解它持续多久、是否久坐/屏幕后加重。",
+                    title = "这个头痛持续多久了呀～",
+                    prompt = "Kitty 想知道持续时间，还有是不是久坐或看屏幕后加重～",
                     step = DailyQuestionStep.FollowUp,
                     order = 101,
                     required = true,
@@ -58,8 +58,8 @@ object FollowUpRuleEngine {
             questions = listOf(
                 DailyQuestion(
                     id = "fu_neck_trigger",
-                    title = "颈肩诱因",
-                    prompt = "找找今天的主要诱因。",
+                    title = "脖子肩膀是什么引起的呀～",
+                    prompt = "来一起找找今天的主要原因～",
                     step = DailyQuestionStep.FollowUp,
                     order = 110,
                     required = true,
@@ -74,8 +74,8 @@ object FollowUpRuleEngine {
                 ),
                 DailyQuestion(
                     id = "fu_neck_radiation",
-                    title = "放射与麻木",
-                    prompt = "有无牵涉到肩/手臂，方便判断肌肉还是神经。",
+                    title = "有扩散到肩膀或手臂吗～",
+                    prompt = "告诉 Kitty，这样能帮你判断是肌肉还是神经问题～",
                     step = DailyQuestionStep.FollowUp,
                     order = 111,
                     required = true,
@@ -96,8 +96,8 @@ object FollowUpRuleEngine {
             questions = listOf(
                 DailyQuestion(
                     id = "fu_stomach_pattern",
-                    title = "胃部不适特点",
-                    prompt = "看看是反酸、胀痛还是刺痛。",
+                    title = "胃是哪种不舒服呀～",
+                    prompt = "让 Kitty 看看是反酸、胀痛还是刺痛～",
                     step = DailyQuestionStep.FollowUp,
                     order = 120,
                     required = true,
@@ -112,8 +112,8 @@ object FollowUpRuleEngine {
                 ),
                 DailyQuestion(
                     id = "fu_stomach_trigger",
-                    title = "进食与作息",
-                    prompt = "哪种情况更容易触发？",
+                    title = "什么时候更容易不舒服呀～",
+                    prompt = "选一个最接近的情况～",
                     step = DailyQuestionStep.FollowUp,
                     order = 121,
                     required = true,
@@ -138,8 +138,8 @@ object FollowUpRuleEngine {
             questions = listOf(
                 DailyQuestion(
                     id = "fu_nasal_main",
-                    title = "鼻咽主要表现",
-                    prompt = "方便判断是过敏、受凉还是感染。",
+                    title = "鼻子喉咙主要是什么感觉～",
+                    prompt = "Kitty 帮你判断是过敏、受凉还是感染～",
                     step = DailyQuestionStep.FollowUp,
                     order = 130,
                     required = true,
@@ -154,8 +154,8 @@ object FollowUpRuleEngine {
                 ),
                 DailyQuestion(
                     id = "fu_nasal_trigger",
-                    title = "可能诱因",
-                    prompt = "帮我确定是否受凉或过敏。",
+                    title = "可能是什么引起的呀～",
+                    prompt = "Kitty 来帮你确定是不是受凉或过敏～",
                     step = DailyQuestionStep.FollowUp,
                     order = 131,
                     required = true,
@@ -176,8 +176,8 @@ object FollowUpRuleEngine {
             questions = listOf(
                 DailyQuestion(
                     id = "fu_knee_trigger",
-                    title = "膝盖加重场景",
-                    prompt = "找找今天膝盖更不适的场景。",
+                    title = "什么时候膝盖更不舒服呀～",
+                    prompt = "Kitty 帮你找找膝盖加重的场景～",
                     step = DailyQuestionStep.FollowUp,
                     order = 140,
                     required = true,
@@ -192,8 +192,8 @@ object FollowUpRuleEngine {
                 ),
                 DailyQuestion(
                     id = "fu_knee_status",
-                    title = "是否肿胀/弹响",
-                    prompt = "了解是否有积液或不稳定感。",
+                    title = "膝盖有肿胀或弹响吗～",
+                    prompt = "Kitty 想知道有没有积液或不稳定感～",
                     step = DailyQuestionStep.FollowUp,
                     order = 141,
                     required = true,

@@ -23,6 +23,8 @@ import com.heldairy.ui.theme.Spacing
 import com.heldairy.ui.theme.CornerRadius
 import com.heldairy.ui.theme.Elevation
 import com.heldairy.ui.theme.success
+import com.heldairy.ui.theme.KittyBackground
+import com.heldairy.ui.theme.BackgroundTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
@@ -96,15 +98,17 @@ fun MedicationListRoute(
     val viewModel: MedicationListViewModel = viewModel(factory = MedicationListViewModel.Factory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    MedicationListScreen(
-        paddingValues = paddingValues,
-        uiState = uiState,
-        onMedClick = onMedClick,
-        onAddMed = onAddClick,
-        onSearchQueryChange = viewModel::onSearchQueryChange,
-        onFilterStatusChange = viewModel::onFilterStatusChange,
-        onSortByChange = viewModel::onSortByChange
-    )
+    KittyBackground(backgroundRes = BackgroundTheme.MEDICATION) {
+        MedicationListScreen(
+            paddingValues = paddingValues,
+            uiState = uiState,
+            onMedClick = onMedClick,
+            onAddMed = onAddClick,
+            onSearchQueryChange = viewModel::onSearchQueryChange,
+            onFilterStatusChange = viewModel::onFilterStatusChange,
+            onSortByChange = viewModel::onSortByChange
+        )
+    }
 }
 
 @Composable

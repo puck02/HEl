@@ -131,6 +131,8 @@ import com.heldairy.ui.theme.accentPeach
 import com.heldairy.ui.theme.BowDecoration
 import com.heldairy.ui.theme.SmallBowDecoration
 import com.heldairy.ui.theme.KittyAvatar
+import com.heldairy.ui.theme.KittyBackground
+import com.heldairy.ui.theme.BackgroundTheme
 import com.heldairy.ui.theme.accentPurple
 import com.heldairy.ui.theme.accentIndigo
 import com.heldairy.ui.theme.accentTeal
@@ -520,15 +522,15 @@ private fun HomeGreetingScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
-            modifier = Modifier
-                .verticalScroll(scrollState)
-                .padding(paddingValues)
-                .padding(top = Spacing.L, bottom = Spacing.M),
-            verticalArrangement = Arrangement.spacedBy(Spacing.M)
-        ) {
+        KittyBackground(backgroundRes = BackgroundTheme.HOME) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(scrollState)
+                    .padding(paddingValues)
+                    .padding(top = Spacing.L, bottom = Spacing.M),
+                verticalArrangement = Arrangement.spacedBy(Spacing.M)
+            ) {
             HeaderCard(
                 uiState = uiState,
                 isDarkTheme = isDarkTheme,
@@ -538,6 +540,7 @@ private fun HomeGreetingScreen(
             MetricGrid(uiState = uiState, onStartDaily = onStartDaily)
             InsightsCTA(hasEntry = uiState.hasTodayEntry, onStartDaily = onStartDaily, onOpenInsights = onOpenInsights)
             Spacer(modifier = Modifier.height(Spacing.XXS))
+        }
         }
     }
 }
