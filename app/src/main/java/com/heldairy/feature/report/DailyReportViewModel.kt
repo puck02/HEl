@@ -14,6 +14,9 @@ import com.heldairy.core.data.DailyAnswerRecord
 import com.heldairy.core.data.DailyReportRepository
 import com.heldairy.core.data.DailySummaryManager
 import com.heldairy.core.data.TrendFlag
+import com.heldairy.core.data.AdviceTrackingRepository
+import com.heldairy.core.database.entity.UserFeedback
+import com.heldairy.core.database.entity.AdviceTrackingEntity
 import com.heldairy.core.database.entity.DailyEntrySnapshot
 import com.heldairy.core.database.entity.DailyEntryWithResponses
 import com.heldairy.feature.report.model.DailyAnswerPayload
@@ -46,6 +49,7 @@ class DailyReportViewModel(
     private val summaryManager: DailySummaryManager,
     private val adviceCoordinator: DailyAdviceCoordinator,
     private val followUpCoordinator: AiFollowUpCoordinator,
+    private val trackingRepository: AdviceTrackingRepository,
     private val aiPreferencesStore: AiPreferencesStore,
     private val clock: Clock = Clock.systemDefaultZone(),
     private val json: Json = Json { ignoreUnknownKeys = true }
@@ -72,9 +76,19 @@ class DailyReportViewModel(
     val events = _events.asSharedFlow()
 
     init {
+        checkTimeRestriction()
         refreshUi()
         observeSnapshots()
         preloadRecentTrends()
+    }
+    
+    private fun checkTimeRestriction() {
+        val now = java.time.LocalTime.now()
+        val targetHour = 20
+        if (now.hour < targetHour) {
+            val message = "今日日记将在 ${targetHour}:00 开放填写，现在是 ${now.hour}:${now.minute.toString().padStart(2, '0')}"
+            _uiState.update { it.copy(isTimeRestricted = true, restrictionMessage = message) }
+        }
     }
 
     fun onOptionSelected(questionId: String, optionId: String) {
@@ -194,6 +208,58 @@ class DailyReportViewModel(
         _adviceState.update { state -> state.copy(isCollapsed = !state.isCollapsed) }
     }
 
+    fun markCurrentAdviceHelpful() {
+        val trackingId = _adviceState.value.trackingItems.firstOrNull()?.id
+        val entryId = _adviceState.value.entryId
+        if (trackingId != null && entryId != null) {
+            markAdviceHelpful(trackingId)
+            // 立即刷新 UI 显示反馈状态
+            viewModelScope.launch {
+                val trackings = trackingRepository.getTrackingsForEntry(entryId)
+                _adviceState.update { it.copy(trackingItems = trackings) }
+            }
+        }
+    }
+
+    fun markCurrentAdviceNotHelpful() {
+        val trackingId = _adviceState.value.trackingItems.firstOrNull()?.id
+        val entryId = _adviceState.value.entryId
+        if (trackingId != null && entryId != null) {
+            markAdviceNotHelpful(trackingId)
+            // 立即刷新 UI 显示反馈状态
+            viewModelScope.launch {
+                val trackings = trackingRepository.getTrackingsForEntry(entryId)
+                _adviceState.update { it.copy(trackingItems = trackings) }
+            }
+        }
+    }
+
+    fun markAdviceHelpful(trackingId: Long) {
+        viewModelScope.launch {
+            trackingRepository.markAsHelpful(trackingId)
+            _events.emit(DailyReportEvent.Snackbar("感谢反馈，这将帮助我提供更好的建议"))
+        }
+    }
+
+    fun markAdviceNotHelpful(trackingId: Long) {
+        viewModelScope.launch {
+            trackingRepository.markAsNotHelpful(trackingId)
+            _events.emit(DailyReportEvent.Snackbar("已记录，我会持续改进"))
+        }
+    }
+
+    fun markAdviceExecuted(trackingId: Long, effectivenessScore: Int?) {
+        viewModelScope.launch {
+            trackingRepository.markAsExecuted(trackingId, effectivenessScore)
+            val message = if (effectivenessScore != null) {
+                "已记录你的执行反馈（${effectivenessScore}分）"
+            } else {
+                "已标记为已执行"
+            }
+            _events.emit(DailyReportEvent.Snackbar(message))
+        }
+    }
+
     private fun resetSession() {
         answers.value = emptyMap()
         sliderDrafts.value = emptyMap()
@@ -219,18 +285,47 @@ class DailyReportViewModel(
             runCatching { json.decodeFromString(AdvicePayload.serializer(), raw) }.getOrNull()
         }
         val keepCollapsed = _adviceState.value.isCollapsed
-        _adviceState.update { current ->
-            current.copy(
-                entryId = snapshot?.entry?.id,
-                entryDate = snapshot?.entry?.entryDate,
-                advice = payload,
-                lastGeneratedAt = snapshot?.advice?.generatedAt,
-                aiEnabled = settings.aiEnabled,
-                apiKeyMissing = settings.apiKey.isBlank(),
-                errorMessage = if (settings.aiEnabled && settings.apiKey.isNotBlank()) current.errorMessage else null,
-                isFallback = payload?.source == AdviceSource.FALLBACK,
-                isCollapsed = if (payload == null) false else keepCollapsed
-            )
+        
+        // 阶段3：加载 tracking 数据
+        val entryId = snapshot?.entry?.id
+        if (entryId != null && payload != null) {
+            viewModelScope.launch {
+                val trackings: List<AdviceTrackingEntity> = runCatching {
+                    trackingRepository.getTrackingsForEntry(entryId)
+                }.getOrNull() ?: emptyList()
+                
+                _adviceState.update { current ->
+                    current.copy(
+                        entryId = entryId,
+                        entryDate = snapshot.entry.entryDate,
+                        advice = payload,
+                        trackingItems = trackings,
+                        adviceSource = payload.source,
+                        lastGeneratedAt = snapshot.advice?.generatedAt,
+                        aiEnabled = settings.aiEnabled,
+                        apiKeyMissing = settings.apiKey.isBlank(),
+                        errorMessage = if (settings.aiEnabled && settings.apiKey.isNotBlank()) current.errorMessage else null,
+                        isFallback = payload.source == AdviceSource.FALLBACK,
+                        isCollapsed = keepCollapsed
+                    )
+                }
+            }
+        } else {
+            _adviceState.update { current ->
+                current.copy(
+                    entryId = snapshot?.entry?.id,
+                    entryDate = snapshot?.entry?.entryDate,
+                    advice = payload,
+                    trackingItems = emptyList(),
+                    adviceSource = payload?.source,
+                    lastGeneratedAt = snapshot?.advice?.generatedAt,
+                    aiEnabled = settings.aiEnabled,
+                    apiKeyMissing = settings.apiKey.isBlank(),
+                    errorMessage = if (settings.aiEnabled && settings.apiKey.isNotBlank()) current.errorMessage else null,
+                    isFallback = payload?.source == AdviceSource.FALLBACK,
+                    isCollapsed = if (payload == null) false else keepCollapsed
+                )
+            }
         }
     }
 
@@ -520,6 +615,7 @@ class DailyReportViewModel(
                     summaryManager = container.dailySummaryManager,
                     adviceCoordinator = container.adviceCoordinator,
                     followUpCoordinator = container.followUpCoordinator,
+                    trackingRepository = AdviceTrackingRepository(dao = container.database.dailyReportDao()),
                     aiPreferencesStore = container.aiPreferencesStore
                 )
             }
@@ -572,13 +668,17 @@ data class DailyReportUiState(
     val questions: List<QuestionUiState> = emptyList(),
     val stepProgress: List<StepProgress> = emptyList(),
     val canSubmit: Boolean = false,
-    val isSaving: Boolean = false
+    val isSaving: Boolean = false,
+    val isTimeRestricted: Boolean = false,
+    val restrictionMessage: String = ""
 )
 
 data class AdviceUiState(
     val entryId: Long? = null,
     val entryDate: String? = null,
     val advice: AdvicePayload? = null,
+    val trackingItems: List<AdviceTrackingEntity> = emptyList(),
+    val adviceSource: AdviceSource? = null,
     val isGenerating: Boolean = false,
     val aiEnabled: Boolean = true,
     val apiKeyMissing: Boolean = true,

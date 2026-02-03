@@ -1,20 +1,33 @@
 package com.heldairy.feature.insights
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
+import com.heldairy.core.data.DoctorReportData
+import com.heldairy.core.data.DoctorReportRepository
 import com.heldairy.core.data.InsightLocalSummary
 import com.heldairy.core.data.InsightRepository
 import com.heldairy.core.data.WeeklyInsightCoordinator
 import com.heldairy.core.data.WeeklyInsightResult
 import com.heldairy.core.data.WeeklyInsightStatus
+import com.heldairy.core.pdf.ImprovedDoctorReportPdfGenerator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 enum class InsightWindowType { Seven, Thirty }
 
@@ -28,12 +41,19 @@ data class InsightsUiState(
     val selectedWindow: InsightWindowType = InsightWindowType.Seven,
     val summary: InsightLocalSummary? = null,
     val weeklyInsight: WeeklyInsightUi = WeeklyInsightUi(),
-    val error: String? = null
+    val error: String? = null,
+    val isGeneratingPreview: Boolean = false,
+    val previewPdfFile: File? = null,
+    val previewError: String? = null,
+    val reportStartDate: LocalDate? = null,
+    val reportEndDate: LocalDate? = null
 )
 
 class InsightsViewModel(
+    private val context: Context,
     private val insightRepository: InsightRepository,
-    private val weeklyInsightCoordinator: WeeklyInsightCoordinator
+    private val weeklyInsightCoordinator: WeeklyInsightCoordinator,
+    private val doctorReportRepository: DoctorReportRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(InsightsUiState())
@@ -41,6 +61,21 @@ class InsightsViewModel(
 
     init {
         refreshData()
+        checkAndAutoGenerateWeekly()
+    }
+    
+    private fun checkAndAutoGenerateWeekly() {
+        viewModelScope.launch {
+            val today = java.time.LocalDate.now()
+            // 只在周日自动生成
+            if (today.dayOfWeek == java.time.DayOfWeek.SUNDAY) {
+                val weekly = weeklyInsightCoordinator.getWeeklyInsight()
+                // 如果本周还没有生成，自动生成
+                if (weekly.status == WeeklyInsightStatus.Pending) {
+                    refreshWeekly(force = true)
+                }
+            }
+        }
     }
 
     fun selectWindow(type: InsightWindowType) {
@@ -75,16 +110,173 @@ class InsightsViewModel(
         }
     }
 
+    /**
+     * 生成PDF预览
+     */
+    fun generatePreview() {
+        viewModelScope.launch {
+            _uiState.update { 
+                it.copy(
+                    isGeneratingPreview = true,
+                    previewError = null,
+                    previewPdfFile = null
+                ) 
+            }
+            
+            runCatching {
+                val state = _uiState.value
+                val reportData = if (state.reportStartDate != null && state.reportEndDate != null) {
+                    doctorReportRepository.generateReportDataWithDateRange(
+                        state.reportStartDate,
+                        state.reportEndDate
+                    )
+                } else {
+                    val timeWindow = when (state.selectedWindow) {
+                        InsightWindowType.Seven -> 7
+                        InsightWindowType.Thirty -> 30
+                    }
+                    doctorReportRepository.generateReportData(timeWindow)
+                }
+                
+                // 检查协程是否被取消
+                ensureActive()
+                
+                // 生成PDF到临时文件
+                withContext(Dispatchers.IO) {
+                    val generator = ImprovedDoctorReportPdfGenerator(context, reportData)
+                    generator.generateToTempFile()
+                }
+            }.onSuccess { pdfFile ->
+                _uiState.update { 
+                    it.copy(
+                        isGeneratingPreview = false,
+                        previewPdfFile = pdfFile
+                    ) 
+                }
+            }.onFailure { throwable ->
+                _uiState.update { 
+                    it.copy(
+                        isGeneratingPreview = false,
+                        previewError = throwable.message ?: "生成预览失败"
+                    ) 
+                }
+            }
+        }
+    }
+
+    /**
+     * 创建保存PDF文件的Intent
+     */
+    fun createSavePdfIntent(tempFile: File): Intent {
+        currentTempFile = tempFile
+        val dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
+        val fileName = "健康报表_${LocalDate.now().format(dateFormatter)}.pdf"
+        
+        return Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_TITLE, fileName)
+        }
+    }
+
+    /**
+     * 创建分享PDF文件的Intent
+     */
+    fun createShareIntent(pdfFile: File): Intent? {
+        return try {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                pdfFile
+            )
+            
+            Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "健康报表")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }.let { Intent.createChooser(it, "分享报表") }
+        } catch (e: Exception) {
+            _uiState.update { it.copy(previewError = "分享失败: ${e.message}") }
+            null
+        }
+    }
+
+    /**
+     * 完成文件保存（从Activity的onActivityResult调用）
+     */
+    fun completeSave(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            currentTempFile?.let { tempFile ->
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                        tempFile.inputStream().use { inputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+                    }
+                }.onSuccess {
+                    // 清理临时文件
+                    tempFile.delete()
+                    _uiState.update { it.copy(previewPdfFile = null) }
+                }.onFailure { throwable ->
+                    _uiState.update { it.copy(previewError = "保存失败: ${throwable.message}") }
+                }
+            }
+            currentTempFile = null
+        }
+    }
+
+    /**
+     * 关闭预览，清理临时文件
+     */
+    fun closePreview() {
+        _uiState.value.previewPdfFile?.delete()
+        _uiState.update { 
+            it.copy(
+                previewPdfFile = null,
+                previewError = null
+            ) 
+        }
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        // 清理临时PDF文件
+        _uiState.value.previewPdfFile?.delete()
+        currentTempFile?.delete()
+    }
+
+    fun clearReportStatus() {
+        _uiState.update { 
+            it.copy(
+                previewError = null
+            ) 
+        }
+    }
+
+    fun setReportDateRange(startDate: LocalDate?, endDate: LocalDate?) {
+        _uiState.update { 
+            it.copy(
+                reportStartDate = startDate,
+                reportEndDate = endDate
+            ) 
+        }
+    }
+
     companion object {
         val Factory = viewModelFactory {
             initializer {
                 val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HElDairyApplication)
                 val container = app.appContainer
                 InsightsViewModel(
+                    context = app.applicationContext,
                     insightRepository = container.insightRepository,
-                    weeklyInsightCoordinator = container.weeklyInsightCoordinator
+                    weeklyInsightCoordinator = container.weeklyInsightCoordinator,
+                    doctorReportRepository = container.doctorReportRepository
                 )
             }
         }
     }
+
+    private var currentTempFile: File? = null
 }

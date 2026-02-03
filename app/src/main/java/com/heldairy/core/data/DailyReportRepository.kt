@@ -82,6 +82,12 @@ class DailyReportRepository(
     suspend fun saveAdvice(advice: DailyAdviceEntity) = withContext(ioDispatcher) {
         dailyReportDao.upsertAdvice(advice)
     }
+    
+    fun entriesForRange(startDate: java.time.LocalDate, endDate: java.time.LocalDate): kotlinx.coroutines.flow.Flow<List<DailyEntryWithResponses>> {
+        val startDateStr = startDate.toString()
+        val endDateStr = endDate.toString()
+        return dailyReportDao.observeEntriesInRange(startDateStr, endDateStr)
+    }
 }
 
 data class DailyAnswerRecord(

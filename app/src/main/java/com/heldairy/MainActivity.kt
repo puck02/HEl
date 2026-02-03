@@ -3,7 +3,14 @@ package com.heldairy
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,7 +30,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.key
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.automirrored.outlined.EventNote
@@ -34,6 +43,9 @@ import androidx.compose.material.icons.outlined.Medication
 import androidx.compose.material.icons.outlined.Mood
 import androidx.compose.material.icons.outlined.Nightlight
 import androidx.compose.material.icons.outlined.RunCircle
+import androidx.compose.material.icons.outlined.SentimentDissatisfied
+import androidx.compose.material.icons.outlined.SentimentNeutral
+import androidx.compose.material.icons.outlined.SentimentVerySatisfied
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Button
@@ -50,6 +62,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,15 +72,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.geometry.CornerRadius as GeometryCornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -81,6 +106,9 @@ import com.heldairy.feature.home.HomeDashboardUiState
 import com.heldairy.feature.home.HomeDashboardViewModel
 import com.heldairy.feature.home.MetricDisplay
 import com.heldairy.feature.insights.ui.InsightsRoute
+import com.heldairy.feature.medication.AddMedicationViewModel
+import com.heldairy.feature.medication.ui.AddMedicationRoute
+import com.heldairy.feature.medication.ui.MedicationDetailRoute
 import com.heldairy.feature.medication.ui.MedicationListRoute
 import com.heldairy.feature.report.ui.DailyReportRoute
 import com.heldairy.feature.settings.ThemeViewModel
@@ -88,8 +116,26 @@ import com.heldairy.feature.settings.ui.SettingsRoute
 import com.heldairy.core.ui.randomDailyCarePrompt
 import com.heldairy.core.ui.randomHomeCarePrompt
 import com.heldairy.ui.theme.HElDairyTheme
+import com.heldairy.ui.theme.Spacing
+import com.heldairy.ui.theme.CornerRadius
+import com.heldairy.ui.theme.Elevation
+import com.heldairy.ui.theme.ElegantAnimations
+import com.heldairy.ui.theme.IconSize
+import com.heldairy.ui.theme.success
+import com.heldairy.ui.theme.warning
+import com.heldairy.ui.theme.info
+import com.heldairy.ui.theme.accentPurple
+import com.heldairy.ui.theme.accentIndigo
+import com.heldairy.ui.theme.accentTeal
+import com.heldairy.ui.theme.accentPeach
+import com.heldairy.ui.theme.accentPurple
+import com.heldairy.ui.theme.accentIndigo
+import com.heldairy.ui.theme.accentTeal
+import com.heldairy.ui.theme.accentPeach
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.delay
+import coil.compose.AsyncImage
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -153,16 +199,11 @@ fun HElDairyApp() {
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             bottomBar = {
-                NavigationBar {
-                    tabs.forEachIndexed { index, tab ->
-                        NavigationBarItem(
-                            selected = selectedIndex == index,
-                            onClick = { selectedIndex = index },
-                            icon = { Icon(imageVector = tab.icon, contentDescription = tab.title) },
-                            label = { Text(tab.title) }
-                        )
-                    }
-                }
+                IOSStyleNavigationBar(
+                    tabs = tabs,
+                    selectedIndex = selectedIndex,
+                    onTabSelected = { selectedIndex = it }
+                )
             }
         ) { innerPadding ->
             when (selectedIndex) {
@@ -179,7 +220,47 @@ fun HElDairyApp() {
                     carePrompt = dailyCarePrompt
                 )
                 2 -> InsightsRoute(paddingValues = innerPadding)
-                3 -> MedicationListRoute(paddingValues = innerPadding)
+                3 -> {
+                    var selectedMedId by rememberSaveable { mutableStateOf<Long?>(null) }
+                    var showAddScreen by rememberSaveable { mutableStateOf(false) }
+                    
+                    val app = LocalContext.current.applicationContext as HElDairyApplication
+                    
+                    when {
+                        selectedMedId != null -> {
+                            // Add key to force recomposition when medId changes
+                            key(selectedMedId) {
+                                MedicationDetailRoute(
+                                    medId = selectedMedId!!,
+                                    paddingValues = innerPadding,
+                                    onBack = { selectedMedId = null }
+                                )
+                            }
+                        }
+                        showAddScreen -> {
+                            val addViewModel: AddMedicationViewModel = viewModel(
+                                key = "addMedication",
+                                factory = AddMedicationViewModel.factory(
+                                    repository = app.appContainer.medicationRepository,
+                                    nlpParser = app.appContainer.medicationNlpParser,
+                                    preferencesStore = app.appContainer.aiPreferencesStore
+                                )
+                            )
+                            AddMedicationRoute(
+                                viewModel = addViewModel,
+                                paddingValues = innerPadding,
+                                onBack = { showAddScreen = false }
+                            )
+                        }
+                        else -> {
+                            MedicationListRoute(
+                                paddingValues = innerPadding,
+                                onMedClick = { medId -> selectedMedId = medId },
+                                onAddClick = { showAddScreen = true }
+                            )
+                        }
+                    }
+                }
                 4 -> SettingsRoute(paddingValues = innerPadding)
                 else -> TabContent(
                     paddingValues = innerPadding,
@@ -228,64 +309,147 @@ private fun PreviewHElDairyApp() {
 }
 
 @Composable
-private fun HeaderCard(isDarkTheme: Boolean, carePrompt: String, onToggleTheme: () -> Unit) {
+private fun HeaderCard(
+    uiState: HomeDashboardUiState,
+    isDarkTheme: Boolean,
+    carePrompt: String,
+    onToggleTheme: () -> Unit
+) {
     val now = LocalDateTime.now()
     val greeting = greetingForHour(now.hour)
     val dayLine = carePrompt
     val dateText = now.format(DateTimeFormatter.ofPattern("M月d日 EEEE"))
-    val shape = RoundedCornerShape(32.dp)
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Transparent
+        ),
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
         modifier = Modifier
-            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .padding(horizontal = Spacing.M, vertical = Spacing.XXS)
             .fillMaxWidth()
-            .shadow(elevation = 16.dp, shape = shape, ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f), spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-    ) {
-        Box(
-            modifier = Modifier
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                            MaterialTheme.colorScheme.background
-                        ),
-                        start = Offset(0f, 0f),
-                        end = Offset(800f, 600f)
-                    ),
-                    shape = shape
-                )
-                .padding(20.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(Brush.radialGradient(listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)))),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = "Alex", color = MaterialTheme.colorScheme.primary, fontSize = 16.sp)
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                    Text(text = dayLine, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(text = "$greeting，Alex", style = MaterialTheme.typography.headlineMedium)
-                    Text(text = dateText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(
-                    onClick = onToggleTheme,
-                    colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-                            shape = CircleShape
-                        )
-                ) {
-                    Icon(
-                        imageVector = if (isDarkTheme) Icons.Outlined.WbSunny else Icons.Outlined.Nightlight,
-                        contentDescription = if (isDarkTheme) "切换到日间" else "切换到夜间"
+            .background(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f)
                     )
+                ),
+                shape = RoundedCornerShape(CornerRadius.Medium)
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
+                    )
+                ),
+                shape = RoundedCornerShape(CornerRadius.Medium)
+            )
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.S),
+            modifier = Modifier.padding(Spacing.M)
+        ) {
+            // 头像
+            Box(
+                modifier = Modifier
+                    .size(IconSize.Hero)  // 使用统一 IconSize
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+                    .border(
+                        width = 2.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.tertiary
+                            )
+                        ),
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (uiState.avatarUri != null) {
+                    AsyncImage(
+                        model = uiState.avatarUri,
+                        contentDescription = "头像",
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "默认头像",
+                        modifier = Modifier.size(IconSize.Large),  // 使用统一 IconSize
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(Spacing.XXS),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = dayLine,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "$greeting，${uiState.userName}",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                Text(
+                    text = dateText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // 主题切换按钮带优雅缩放
+            var isPressed by remember { mutableStateOf(false) }
+            val scale by animateFloatAsState(
+                targetValue = if (isPressed) 0.92f else 1f,
+                animationSpec = ElegantAnimations.elegantSpring,
+                label = "theme_button_scale"
+            )
+            
+            IconButton(
+                onClick = {
+                    isPressed = true
+                    onToggleTheme()
+                },
+                colors = IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ),
+                modifier = Modifier
+                    .size(48.dp)
+                    .scale(scale)
+                    .background(
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                        shape = CircleShape
+                    )
+            ) {
+                Icon(
+                    imageVector = if (isDarkTheme) Icons.Outlined.WbSunny else Icons.Outlined.Nightlight,
+                    contentDescription = if (isDarkTheme) "切换到日间" else "切换到夜间"
+                )
+            }
+            
+            LaunchedEffect(isPressed) {
+                if (isPressed) {
+                    delay(150)
+                    isPressed = false
                 }
             }
         }
@@ -346,31 +510,28 @@ private fun HomeGreetingScreen(
     onToggleTheme: () -> Unit
 ) {
     val scrollState = rememberScrollState()
-    val background = Brush.radialGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-            MaterialTheme.colorScheme.background
-        ),
-        center = Offset(x = 120f, y = 120f),
-        radius = 1200f
-    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(background)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
                 .verticalScroll(scrollState)
                 .padding(paddingValues)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(top = Spacing.L, bottom = Spacing.M),
+            verticalArrangement = Arrangement.spacedBy(Spacing.M)
         ) {
-            HeaderCard(isDarkTheme = isDarkTheme, carePrompt = carePrompt, onToggleTheme = onToggleTheme)
+            HeaderCard(
+                uiState = uiState,
+                isDarkTheme = isDarkTheme,
+                carePrompt = carePrompt,
+                onToggleTheme = onToggleTheme
+            )
             MetricGrid(uiState = uiState, onStartDaily = onStartDaily)
             InsightsCTA(hasEntry = uiState.hasTodayEntry, onStartDaily = onStartDaily, onOpenInsights = onOpenInsights)
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(Spacing.XXS))
         }
     }
 }
@@ -380,44 +541,58 @@ private fun MetricGrid(uiState: HomeDashboardUiState, onStartDaily: () -> Unit) 
     val shouldRedirectToDaily = !uiState.hasTodayEntry
     Column(
         modifier = Modifier
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = Spacing.M)
             .fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(Spacing.S)
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S), modifier = Modifier.fillMaxWidth()) {
             MetricCard(
                 title = "步数",
                 metric = uiState.steps,
                 icon = Icons.Outlined.RunCircle,
                 modifier = Modifier.weight(1f),
-                accent = Color(0xFF2EA27C),
-                onClick = if (shouldRedirectToDaily || uiState.steps == null) onStartDaily else null
+                onClick = if (shouldRedirectToDaily || uiState.steps == null) onStartDaily else null,
+                index = 0
             )
             MetricCard(
                 title = "昨晚睡眠",
                 metric = uiState.sleep,
                 icon = Icons.Outlined.Nightlight,
                 modifier = Modifier.weight(1f),
-                accent = Color(0xFF7C5BE9),
-                onClick = if (shouldRedirectToDaily || uiState.sleep == null) onStartDaily else null
+                onClick = if (shouldRedirectToDaily || uiState.sleep == null) onStartDaily else null,
+                index = 1
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.S), modifier = Modifier.fillMaxWidth()) {
+            // 根据心情值动态改变图标
+            val moodIcon = when {
+                uiState.mood == null -> Icons.Outlined.Mood
+                else -> {
+                    val moodScore = uiState.mood.value.split("/").firstOrNull()?.trim()?.toIntOrNull() ?: 5
+                    when {
+                        moodScore <= 3 -> Icons.Outlined.SentimentVerySatisfied  // 平稳
+                        moodScore <= 6 -> Icons.Outlined.SentimentNeutral       // 略烦躁
+                        else -> Icons.Outlined.SentimentDissatisfied            // 明显紧绷
+                    }
+                }
+            }
+            
             MetricCard(
                 title = "今日心情",
                 metric = uiState.mood,
                 icon = Icons.Outlined.Mood,
+                dynamicIcon = moodIcon,
                 modifier = Modifier.weight(1f),
-                accent = Color(0xFFCC6A3A),
-                onClick = if (shouldRedirectToDaily || uiState.mood == null) onStartDaily else null
+                onClick = if (shouldRedirectToDaily || uiState.mood == null) onStartDaily else null,
+                index = 2
             )
             MetricCard(
                 title = "身体能量",
                 metric = uiState.energy,
                 icon = Icons.Outlined.Bolt,
                 modifier = Modifier.weight(1f),
-                accent = Color(0xFF3D7CE0),
-                onClick = if (shouldRedirectToDaily || uiState.energy == null) onStartDaily else null
+                onClick = if (shouldRedirectToDaily || uiState.energy == null) onStartDaily else null,
+                index = 3
             )
         }
     }
@@ -425,64 +600,74 @@ private fun MetricGrid(uiState: HomeDashboardUiState, onStartDaily: () -> Unit) 
 
 @Composable
 private fun InsightsCTA(hasEntry: Boolean, onStartDaily: () -> Unit, onOpenInsights: () -> Unit) {
-    val accent = Color(0xFF7D6BEE)
-    val shape = RoundedCornerShape(28.dp)
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val gradient = if (isDark) {
-        Brush.linearGradient(
-            listOf(
-                Color(0xFF1C1B2B),
-                Color(0xFF222640),
-                Color(0xFF1A1F32)
-            )
-        )
-    } else {
-        Brush.linearGradient(
-            listOf(
-                Color(0xFFE9E2FF),
-                Color(0xFFF0EEFF),
-                Color(0xFFE6ECFF)
-            )
-        )
-    }
+    // 按钮缩放动画
+    var isPressed by remember { mutableStateOf(false) }
+    val buttonScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = ElegantAnimations.elegantSpring,
+        label = "button_scale"
+    )
+    
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)  // 使用半透明背景
+        ),
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.Low),  // 添加微妙阴影
         modifier = Modifier
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = Spacing.M)
             .fillMaxWidth()
     ) {
-        Box(
-            modifier = Modifier
-                .background(
-                    gradient,
-                    shape = shape
-                )
-                .shadow(elevation = 10.dp, shape = shape, ambientColor = accent.copy(alpha = 0.12f), spotColor = accent.copy(alpha = 0.10f))
-                .padding(horizontal = 20.dp, vertical = 18.dp)
+        Column(
+            verticalArrangement = Arrangement.spacedBy(Spacing.S),
+            modifier = Modifier.padding(Spacing.M)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(text = "洞察", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-                    Icon(imageVector = Icons.AutoMirrored.Outlined.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Text(
-                    text = "每周日更新 · 近 7 天 / 30 天趋势",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.XS)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Assessment,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
                 )
-                Button(
-                    onClick = if (hasEntry) onOpenInsights else onStartDaily,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(40.dp),
-                    colors = if (isDark) {
-                        ButtonDefaults.buttonColors(containerColor = Color(0xFF292F47), contentColor = Color.White)
-                    } else {
-                        ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = accent)
-                    }
-                ) {
-                    Text(text = if (hasEntry) "前往洞察" else "先完成今日日报", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "洞察",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Text(
+                text = "每周日更新 · 近 7 天 / 30 天趋势",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Button(
+                onClick = {
+                    isPressed = true
+                    if (hasEntry) onOpenInsights() else onStartDaily()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .scale(buttonScale),
+                shape = RoundedCornerShape(CornerRadius.XLarge),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Text(
+                    text = if (hasEntry) "前往洞察" else "先完成今日日报",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            
+            LaunchedEffect(isPressed) {
+                if (isPressed) {
+                    delay(100)
+                    isPressed = false
                 }
             }
         }
@@ -495,79 +680,202 @@ private fun MetricCard(
     metric: MetricDisplay?,
     icon: ImageVector,
     modifier: Modifier = Modifier,
-    accent: Color = MaterialTheme.colorScheme.primary,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    index: Int = 0,
+    dynamicIcon: ImageVector? = null  // 新增：允许传入动态图标
 ) {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val gradient = if (isDark) {
-        when (title) {
-            "步数" -> listOf(Color(0xFF0F1F18), Color(0xFF132820))
-            "昨晚睡眠" -> listOf(Color(0xFF18142B), Color(0xFF201B37))
-            "今日心情" -> listOf(Color(0xFF2A1B14), Color(0xFF331F1A))
-            "身体能量" -> listOf(Color(0xFF0F2135), Color(0xFF132B46))
-            else -> listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.surface)
-        }
-    } else {
-        when (title) {
-            "步数" -> listOf(Color(0xFFDFFBF0), Color(0xFFF5FFFA))
-            "昨晚睡眠" -> listOf(Color(0xFFF0E9FF), Color(0xFFF8F4FF))
-            "今日心情" -> listOf(Color(0xFFFFF0E0), Color(0xFFFFF8EE))
-            "身体能量" -> listOf(Color(0xFFE8F3FF), Color(0xFFF7FBFF))
-            else -> listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.surface)
-        }
-    }
-    val shape = RoundedCornerShape(28.dp)
     val clickable = onClick != null
+    
+    // 使用动态图标或默认图标
+    val displayIcon = dynamicIcon ?: icon
+    
+    // 每个卡片使用不同的 Accent 颜色
+    val accentColor = when (index) {
+        0 -> MaterialTheme.colorScheme.accentPurple   // 睡眠
+        1 -> MaterialTheme.colorScheme.accentTeal     // 情绪
+        2 -> MaterialTheme.colorScheme.accentIndigo   // 症状
+        3 -> MaterialTheme.colorScheme.accentPeach    // 能量
+        else -> MaterialTheme.colorScheme.primary
+    }
+    
+    // Staggered入场动画 - 优雅延迟
+    var isVisible by remember { mutableStateOf(false) }
+    val alpha by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = ElegantAnimations.smoothEntry,
+        label = "card_alpha_$index"
+    )
+    val offsetY by animateFloatAsState(
+        targetValue = if (isVisible) 0f else 20f,
+        animationSpec = ElegantAnimations.smoothEntry,
+        label = "card_offset_$index"
+    )
+    
+    LaunchedEffect(Unit) {
+        delay(index * 60L)  // 略微加快 stagger
+        isVisible = true
+    }
+    
+    // 按压缩放动画
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = ElegantAnimations.elegantSpring,
+        label = "card_scale_$index"
+    )
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        modifier = modifier.shadow(elevation = 12.dp, shape = shape, ambientColor = accent.copy(alpha = 0.18f), spotColor = accent.copy(alpha = 0.12f))
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = Elevation.Low,
+            pressedElevation = Elevation.None
+        ),
+        modifier = modifier
+            .scale(scale)
+            .graphicsLayer {
+                this.alpha = alpha
+                translationY = offsetY
+            }
     ) {
         Box(
             modifier = Modifier
-                .background(
-                    brush = Brush.verticalGradient(gradient),
-                    shape = shape
-                )
-                .heightIn(min = 190.dp)
-                .clip(shape)
+                .heightIn(min = 180.dp)
                 .then(
-                    if (clickable) Modifier.clickable(onClick = onClick!!) else Modifier
+                    if (clickable) Modifier.clickable {
+                        isPressed = true
+                        onClick!!()
+                    } else Modifier
                 )
-                .padding(20.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxSize()) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Icon(imageVector = icon, contentDescription = null, tint = accent)
-                    Text(text = title, style = MaterialTheme.typography.titleMedium)
+            // 装饰性背景圆形（右上角）
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0.06f)
+            ) {
+                val circleRadius = size.width * 0.5f
+                val center = Offset(
+                    x = size.width * 1.1f,
+                    y = -size.height * 0.2f
+                )
+                drawCircle(
+                    color = accentColor,
+                    radius = circleRadius,
+                    center = center
+                )
+            }
+            
+            Column(
+                verticalArrangement = Arrangement.spacedBy(Spacing.S),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(Spacing.M)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.XS)
+                ) {
+                    // 使用 Accent 颜色的图标
+                    Icon(
+                        imageVector = displayIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(IconSize.Large),
+                        tint = accentColor
+                    )
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
-                MetricSpark(accent = accent)
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                MetricSpark(weeklyData = metric?.weeklyData ?: emptyList())
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.XXS)) {
                     if (metric != null) {
-                        Text(text = metric.value, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
-                        Text(text = metric.hint ?: "", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = metric.value,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = metric.hint ?: "",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     } else {
-                        Text(text = "点击记录", style = MaterialTheme.typography.bodyMedium, color = accent)
-                        Text(text = "今日还未填写", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = "点击记录",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "今日还未填写",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
         }
     }
+    
+    LaunchedEffect(isPressed) {
+        if (isPressed) {
+            delay(100)
+            isPressed = false
+        }
+    }
 }
 
 @Composable
-private fun MetricSpark(accent: Color) {
-    val bars = listOf(18.dp, 32.dp, 22.dp, 28.dp)
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
-        bars.forEachIndexed { index, height ->
+private fun MetricSpark(weeklyData: List<Float>) {
+    // 如果没有数据，使用默认占位符
+    val bars = if (weeklyData.isEmpty()) {
+        listOf(0.4f, 0.8f, 0.5f, 0.7f)
+    } else {
+        weeklyData
+    }
+    
+    // 将数据归一化到dp高度 (最大40dp，最小8dp)
+    val maxHeight = 40.dp
+    val minHeight = 8.dp
+    val heights = bars.map { value ->
+        val normalizedValue = value.coerceIn(0f, 1f)
+        minHeight + (maxHeight - minHeight) * normalizedValue
+    }
+    
+    val animatedHeights = heights.mapIndexed { index, height ->
+        animateDpAsState(
+            targetValue = height,
+            animationSpec = tween(durationMillis = 600, delayMillis = index * 100),
+            label = "spark_height_$index"
+        )
+    }
+    
+    val animatedAlphas = bars.mapIndexed { index, _ ->
+        animateFloatAsState(
+            targetValue = (0.5f + (index * 0.08f)).coerceIn(0.5f, 1.0f),  // 确保alpha在合法范围内
+            animationSpec = tween(durationMillis = 600, delayMillis = index * 100),
+            label = "spark_alpha_$index"
+        )
+    }
+    
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.XXS),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        animatedHeights.forEachIndexed { index, animatedHeight ->
             Box(
                 modifier = Modifier
                     .width(10.dp)
-                    .height(height)
-                    .clip(RoundedCornerShape(6.dp))
+                    .height(animatedHeight.value)
+                    .clip(RoundedCornerShape(CornerRadius.Small))
                     .background(
-                        color = accent.copy(alpha = 0.65f + (index * 0.07f)),
+                        color = MaterialTheme.colorScheme.primary.copy(
+                            alpha = animatedAlphas[index].value
+                        )
                     )
             )
         }
@@ -579,4 +887,138 @@ private fun greetingForHour(hour: Int): String = when (hour) {
     in 12..13 -> "中午好"
     in 14..17 -> "下午好"
     else -> "晚上好"
+}
+
+@Composable
+private fun IOSStyleNavigationBar(
+    tabs: List<ConciergeTab>,
+    selectedIndex: Int,
+    onTabSelected: (Int) -> Unit
+) {
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val primaryColor = MaterialTheme.colorScheme.primary
+    
+    // 计算indicator位置和宽度
+    val itemWidth = remember { mutableStateOf(0f) }
+    val targetOffset = if (itemWidth.value > 0) selectedIndex * itemWidth.value else 0f
+    
+    // 使用Spring动画实现流畅的indicator移动
+    val indicatorOffset by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = targetOffset,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "indicator_offset"
+    )
+    
+    // indicator宽度动画 - 移动时略微拉伸
+    val indicatorWidth by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = itemWidth.value * 0.5f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "indicator_width"
+    )
+    
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(surfaceColor)
+    ) {
+        // 使用Canvas绘制水滴形状的indicator
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp)
+        ) {
+            val canvasWidth = size.width
+            val canvasHeight = size.height
+            val tabCount = tabs.size
+            val calculatedItemWidth = canvasWidth / tabCount
+            
+            // 更新itemWidth用于offset计算
+            itemWidth.value = calculatedItemWidth
+            
+            // 绘制iOS风格的水滴indicator
+            val indicatorCenterX = indicatorOffset + calculatedItemWidth / 2
+            val indicatorY = canvasHeight * 0.3f
+            val indicatorHeight = 36.dp.toPx()
+            
+            // 绘制圆角矩形作为indicator背景（带模糊效果）
+            drawRoundRect(
+                color = primaryColor.copy(alpha = 0.15f),
+                topLeft = Offset(
+                    x = indicatorCenterX - indicatorWidth / 2,
+                    y = indicatorY
+                ),
+                size = Size(indicatorWidth, indicatorHeight),
+                cornerRadius = GeometryCornerRadius(
+                    x = indicatorHeight / 2,
+                    y = indicatorHeight / 2
+                )
+            )
+        }
+        
+        // Tab items
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabs.forEachIndexed { index, tab ->
+                val isSelected = selectedIndex == index
+                
+                // 选中状态的缩放动画
+                val scale by animateFloatAsState(
+                    targetValue = if (isSelected) 1.1f else 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    ),
+                    label = "tab_scale_$index"
+                )
+                
+                // 选中状态的alpha动画
+                val alpha by animateFloatAsState(
+                    targetValue = if (isSelected) 1f else 0.5f,
+                    animationSpec = tween(durationMillis = 200),
+                    label = "tab_alpha_$index"
+                )
+                
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null
+                        ) { onTabSelected(index) }
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            this.alpha = alpha
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = tab.icon,
+                        contentDescription = tab.title,
+                        modifier = Modifier.size(24.dp),
+                        tint = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = tab.title,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                }
+            }
+        }
+    }
 }

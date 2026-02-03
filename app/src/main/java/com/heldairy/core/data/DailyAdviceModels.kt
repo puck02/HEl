@@ -72,5 +72,6 @@ data class AdvicePayload(
 @Serializable
 enum class AdviceSource {
     @SerialName("ai") AI,
+    @SerialName("local") LOCAL,
     @SerialName("fallback") FALLBACK
 }

@@ -9,7 +9,10 @@ data class Med(
     val note: String? = null,
     val infoSummary: String? = null,
     val imageUri: String? = null,
-    val hasActiveCourse: Boolean = false
+    val hasActiveCourse: Boolean = false,
+    val currentCourse: MedCourse? = null,
+    val createdAt: LocalDate = LocalDate.now(),
+    val updatedAt: LocalDate = LocalDate.now()
 )
 
 data class MedCourse(
@@ -27,6 +30,13 @@ enum class CourseStatus {
     ACTIVE,
     PAUSED,
     ENDED;
+
+    val displayName: String
+        get() = when (this) {
+            ACTIVE -> "正在服用"
+            PAUSED -> "已暂停"
+            ENDED -> "已停用"
+        }
 
     fun toDbString(): String = name.lowercase()
 

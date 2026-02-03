@@ -2,6 +2,7 @@ package com.heldairy.feature.report.ui
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Nightlight
@@ -35,6 +38,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -60,6 +64,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.heldairy.core.data.AdvicePayload
+import com.heldairy.core.database.entity.AdviceTrackingEntity
+import com.heldairy.core.database.entity.UserFeedback
 import com.heldairy.core.data.AdviceSource
 import com.heldairy.feature.report.AdviceUiState
 import com.heldairy.feature.report.DailyReportEvent
@@ -67,6 +73,9 @@ import com.heldairy.feature.report.DailyReportUiState
 import com.heldairy.feature.report.DailyReportViewModel
 import com.heldairy.feature.report.QuestionUiState
 import com.heldairy.feature.report.model.QuestionKind
+import com.heldairy.ui.theme.Spacing
+import com.heldairy.ui.theme.CornerRadius
+import com.heldairy.ui.theme.Elevation
 import kotlinx.coroutines.flow.collectLatest
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -81,7 +90,6 @@ fun DailyReportRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val adviceState by viewModel.adviceState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val palette = rememberReportPalette()
 
     LaunchedEffect(viewModel) {
         viewModel.events.collectLatest { event ->
@@ -94,7 +102,7 @@ fun DailyReportRoute(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(palette.background)
+            .background(MaterialTheme.colorScheme.background)
             .padding(paddingValues)
     ) {
         DailyReportScreen(
@@ -108,13 +116,15 @@ fun DailyReportRoute(
             onSubmit = viewModel::submitDailyReport,
             onAdviceRetry = viewModel::refreshAdvice,
             onToggleAdviceCollapse = viewModel::toggleAdviceCollapse,
+            onMarkAdviceHelpful = viewModel::markCurrentAdviceHelpful,
+            onMarkAdviceNotHelpful = viewModel::markCurrentAdviceNotHelpful,
             modifier = Modifier.fillMaxSize()
         )
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 24.dp)
+                .padding(bottom = Spacing.M)
         )
     }
 }
@@ -131,14 +141,69 @@ fun DailyReportScreen(
     onSubmit: () -> Unit,
     onAdviceRetry: () -> Unit,
     onToggleAdviceCollapse: () -> Unit,
+    onMarkAdviceHelpful: () -> Unit,
+    onMarkAdviceNotHelpful: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+        contentPadding = PaddingValues(
+            start = Spacing.M,
+            end = Spacing.M,
+            top = Spacing.L,
+            bottom = Spacing.M
+        ),
+        verticalArrangement = Arrangement.spacedBy(Spacing.M)
     ) {
         item { DailyHeader(carePrompt = carePrompt) }
+        
+        // Time suggestion hint
+        item {
+            Text(
+                text = "建议每晚 20:00 后填写日报记录",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+        
+        if (state.isTimeRestricted) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Nightlight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Text(
+                            text = state.restrictionMessage,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "记录睡前状态，让我更了解你的健康规律",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+        
         itemsIndexed(
             items = state.questions.filter { it.isVisible },
             key = { _, item -> item.question.id }
@@ -149,12 +214,13 @@ fun DailyReportScreen(
                 onOptionSelected = onOptionSelected,
                 onSliderValueChange = onSliderValueChange,
                 onSliderValueFinished = onSliderValueChangeFinished,
-                onTextChanged = onTextChanged
+                onTextChanged = onTextChanged,
+                isEnabled = !state.isTimeRestricted
             )
         }
         item {
             SubmitBar(
-                canSubmit = state.canSubmit,
+                canSubmit = state.canSubmit && !state.isTimeRestricted,
                 isSaving = state.isSaving,
                 onSubmit = onSubmit,
                 modifier = Modifier.fillMaxWidth()
@@ -165,10 +231,12 @@ fun DailyReportScreen(
                 adviceState = adviceState,
                 onRetry = onAdviceRetry,
                 onToggleCollapse = onToggleAdviceCollapse,
+                onMarkHelpful = onMarkAdviceHelpful,
+                onMarkNotHelpful = onMarkAdviceNotHelpful,
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        item { Spacer(modifier = Modifier.height(24.dp)) }
+        item { Spacer(modifier = Modifier.height(Spacing.M)) }
     }
 }
 
@@ -181,39 +249,51 @@ private fun DailyHeader(carePrompt: String) {
         in 12..17 -> "午安"
         else -> "晚安"
     }
-    val palette = rememberReportPalette()
 
-    GlowCard(
-        glowBrush = Brush.radialGradient(
-            colors = listOf(palette.accentPrimary.copy(alpha = 0.35f), Color.Transparent)
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
-        shape = RoundedCornerShape(24.dp)
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.Low),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(palette.card, shape = RoundedCornerShape(22.dp))
-                .padding(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(Spacing.M),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.S),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(palette.badgeBackground),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = Icons.Outlined.Nightlight, contentDescription = null, tint = palette.accentPrimary)
+                Icon(
+                    imageVector = Icons.Outlined.Nightlight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(text = dateText, style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.XXS)) {
+                Text(
+                    text = dateText,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Text(
                     text = "$greeting，今天我陪你记录状态。",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = palette.textPrimary
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(text = carePrompt, style = MaterialTheme.typography.bodySmall, color = palette.textSecondary)
+                Text(
+                    text = carePrompt,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -226,38 +306,55 @@ private fun QuestionCard(
     onOptionSelected: (String, String) -> Unit,
     onSliderValueChange: (String, Float) -> Unit,
     onSliderValueFinished: (String) -> Unit,
-    onTextChanged: (String, String) -> Unit
+    onTextChanged: (String, String) -> Unit,
+    isEnabled: Boolean = true
 ) {
-    val palette = rememberReportPalette()
-    GlowCard(
-        glowBrush = Brush.radialGradient(
-            colors = listOf(palette.accentPrimary.copy(alpha = 0.35f), palette.accentSecondary.copy(alpha = 0.1f), Color.Transparent)
+    Card(
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
         ),
-        shape = RoundedCornerShape(26.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
+                    )
+                ),
+                shape = RoundedCornerShape(CornerRadius.Medium)
+            )
     ) {
-        Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = palette.cardElevated),
-            border = BorderStroke(1.dp, palette.cardStroke)
+        Column(
+            modifier = Modifier.padding(Spacing.M),
+            verticalArrangement = Arrangement.spacedBy(Spacing.M)
         ) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    NumberBadge(position)
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(text = questionState.question.title, style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
-                        Text(
-                            text = questionState.question.prompt,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = palette.textSecondary
-                        )
-                    }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.S)
+            ) {
+                NumberBadge(position)
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.XXS)) {
+                    Text(
+                        text = questionState.question.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = questionState.question.prompt,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                when (questionState) {
-                    is QuestionUiState.SingleChoice -> ChoiceSection(questionState, onOptionSelected)
-                    is QuestionUiState.MultipleChoice -> MultiChoiceSection(questionState, onOptionSelected)
-                    is QuestionUiState.Slider -> SliderSection(questionState, onSliderValueChange, onSliderValueFinished)
-                    is QuestionUiState.TextInput -> TextInputSection(questionState, onTextChanged)
-                }
+            }
+            when (questionState) {
+                is QuestionUiState.SingleChoice -> ChoiceSection(questionState, onOptionSelected, isEnabled)
+                is QuestionUiState.MultipleChoice -> MultiChoiceSection(questionState, onOptionSelected, isEnabled)
+                is QuestionUiState.Slider -> SliderSection(questionState, onSliderValueChange, onSliderValueFinished, isEnabled)
+                is QuestionUiState.TextInput -> TextInputSection(questionState, onTextChanged, isEnabled)
             }
         }
     }
@@ -265,18 +362,35 @@ private fun QuestionCard(
 
 @Composable
 private fun NumberBadge(index: Int) {
-    val palette = rememberReportPalette()
     Box(
         modifier = Modifier
             .size(36.dp)
             .clip(CircleShape)
-            .background(palette.badgeBackground),
+            .background(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
+                    )
+                )
+            )
+            .border(
+                width = 1.5.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
+                    )
+                ),
+                shape = CircleShape
+            ),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = index.toString(),
             style = MaterialTheme.typography.titleMedium,
-            color = palette.accentPrimary
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }
@@ -285,27 +399,38 @@ private fun NumberBadge(index: Int) {
 @Composable
 private fun ChoiceSection(
     state: QuestionUiState.SingleChoice,
-    onOptionSelected: (String, String) -> Unit
+    onOptionSelected: (String, String) -> Unit,
+    isEnabled: Boolean = true
 ) {
-    val palette = rememberReportPalette()
     val options = (state.question.kind as QuestionKind.SingleChoice).options
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.S),
+        verticalArrangement = Arrangement.spacedBy(Spacing.S)
+    ) {
         options.forEach { option ->
+            val isSelected = option.id == state.selectedOptionId
             FilterChip(
-                selected = option.id == state.selectedOptionId,
+                selected = isSelected,
+                enabled = isEnabled,
                 onClick = { onOptionSelected(state.question.id, option.id) },
-                    label = { Text(option.label, color = if (option.id == state.selectedOptionId) MaterialTheme.colorScheme.onPrimary else palette.textPrimary) },
+                label = {
+                    Text(
+                        option.label,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurface
+                    )
+                },
+                shape = RoundedCornerShape(CornerRadius.XLarge),
                 colors = FilterChipDefaults.filterChipColors(
-                        containerColor = palette.card,
-                        selectedContainerColor = palette.accentPrimary,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = palette.card
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
-                    selected = option.id == state.selectedOptionId,
-                        selectedBorderColor = palette.accentPrimary,
-                        borderColor = palette.chipBorder
+                    selected = isSelected,
+                    selectedBorderColor = MaterialTheme.colorScheme.primary,
+                    borderColor = MaterialTheme.colorScheme.outlineVariant
                 )
             )
         }
@@ -316,44 +441,57 @@ private fun ChoiceSection(
 @Composable
 private fun MultiChoiceSection(
     state: QuestionUiState.MultipleChoice,
-    onOptionSelected: (String, String) -> Unit
+    onOptionSelected: (String, String) -> Unit,
+    isEnabled: Boolean = true
 ) {
-    val palette = rememberReportPalette()
     val options = (state.question.kind as QuestionKind.MultipleChoice).options
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.S),
+            verticalArrangement = Arrangement.spacedBy(Spacing.S)
+        ) {
             options.forEach { option ->
                 val selected = state.selectedOptionIds.contains(option.id)
                 FilterChip(
                     selected = selected,
                     onClick = { onOptionSelected(state.question.id, option.id) },
-                    label = { Text(option.label, color = if (selected) MaterialTheme.colorScheme.onPrimary else palette.textPrimary) },
+                    enabled = isEnabled,
+                    label = {
+                        Text(
+                            option.label,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    shape = RoundedCornerShape(CornerRadius.XLarge),
                     colors = FilterChipDefaults.filterChipColors(
-                        containerColor = palette.card,
-                        selectedContainerColor = palette.accentPrimary,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = palette.card
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                     ),
                     border = FilterChipDefaults.filterChipBorder(
                         enabled = true,
                         selected = selected,
-                        selectedBorderColor = palette.accentPrimary,
-                        borderColor = palette.chipBorder
+                        selectedBorderColor = MaterialTheme.colorScheme.primary,
+                        borderColor = MaterialTheme.colorScheme.outlineVariant
                     )
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.XS),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
                 text = "已选 ${state.selectedOptionIds.size}/${state.maxSelection}",
                 style = MaterialTheme.typography.labelMedium,
-                color = palette.accentPrimary
+                color = MaterialTheme.colorScheme.primary
             )
             state.helperText?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.labelSmall,
-                    color = palette.textSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -364,18 +502,18 @@ private fun MultiChoiceSection(
 private fun SliderSection(
     state: QuestionUiState.Slider,
     onSliderValueChange: (String, Float) -> Unit,
-    onSliderValueFinished: (String) -> Unit
+    onSliderValueFinished: (String) -> Unit,
+    isEnabled: Boolean = true
 ) {
-    val palette = rememberReportPalette()
     val sliderKind = state.question.kind as QuestionKind.Slider
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
         Text(
             text = "${state.currentValue}${sliderKind.valueSuffix.orEmpty()}",
             style = MaterialTheme.typography.headlineMedium,
-            color = palette.textPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 4.dp),
+                .padding(bottom = Spacing.XXS),
             textAlign = TextAlign.Center
         )
         Slider(
@@ -383,15 +521,20 @@ private fun SliderSection(
             valueRange = sliderKind.valueRange.first.toFloat()..sliderKind.valueRange.last.toFloat(),
             onValueChange = { newValue -> onSliderValueChange(state.question.id, newValue) },
             onValueChangeFinished = { onSliderValueFinished(state.question.id) },
+            enabled = isEnabled,
             steps = sliderKind.valueRange.last - sliderKind.valueRange.first - 1,
             colors = SliderDefaults.colors(
-                thumbColor = palette.accentPrimary,
-                activeTrackColor = palette.accentPrimary,
-                inactiveTrackColor = palette.sliderInactive
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         )
         sliderKind.supportingText?.let {
-            Text(text = it, style = MaterialTheme.typography.bodySmall, color = palette.textSecondary)
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -399,12 +542,14 @@ private fun SliderSection(
 @Composable
 private fun TextInputSection(
     state: QuestionUiState.TextInput,
-    onTextChanged: (String, String) -> Unit
+    onTextChanged: (String, String) -> Unit,
+    isEnabled: Boolean = true
 ) {
     val textKind = state.question.kind as QuestionKind.TextInput
     OutlinedTextField(
         value = state.text,
         onValueChange = { updated -> onTextChanged(state.question.id, updated) },
+        enabled = isEnabled,
         modifier = Modifier.fillMaxWidth(),
         placeholder = { Text(textKind.hint) },
         supportingText = textKind.supportingText?.let { helper ->
@@ -412,12 +557,13 @@ private fun TextInputSection(
                 Text(
                     text = helper,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF8DA0C2)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
         singleLine = false,
-        maxLines = 4
+        maxLines = 4,
+        shape = RoundedCornerShape(CornerRadius.Medium)
     )
 }
 
@@ -428,50 +574,49 @@ private fun SubmitBar(
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val palette = rememberReportPalette()
-    GlowCard(
-        glowBrush = Brush.radialGradient(
-            colors = listOf(palette.accentPrimary.copy(alpha = 0.35f), Color.Transparent)
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.Low),
         modifier = modifier
     ) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = palette.cardElevated),
-            shape = RoundedCornerShape(18.dp)
+        Column(
+            modifier = Modifier.padding(Spacing.M),
+            verticalArrangement = Arrangement.spacedBy(Spacing.XS)
         ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Button(
+                onClick = onSubmit,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = canSubmit && !isSaving,
+                shape = RoundedCornerShape(CornerRadius.XLarge)
             ) {
-                Button(
-                    onClick = onSubmit,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = canSubmit && !isSaving
-                ) {
-                    Crossfade(targetState = isSaving, label = "buttonState") { saving ->
-                        if (saving) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                                Text("正在保存…")
-                            }
-                        } else {
-                            Text("完成今日基础问题")
+                Crossfade(targetState = isSaving, label = "buttonState") { saving ->
+                    if (saving) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.S)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Text("正在保存…")
                         }
+                    } else {
+                        Text("完成今日基础问题")
                     }
                 }
-                Text(
-                    text = "需要调整？可重新填写，我会以最新记录为准。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = palette.textSecondary,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
             }
+            Text(
+                text = "需要调整？可重新填写，我会以最新记录为准。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -481,6 +626,8 @@ private fun AdviceSection(
     adviceState: AdviceUiState,
     onRetry: () -> Unit,
     onToggleCollapse: () -> Unit,
+    onMarkHelpful: () -> Unit,
+    onMarkNotHelpful: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -513,7 +660,10 @@ private fun AdviceSection(
                     payload = adviceState.advice,
                     generatedAt = adviceState.lastGeneratedAt,
                     isFallback = adviceState.isFallback,
-                    isCollapsed = adviceState.isCollapsed
+                    isCollapsed = adviceState.isCollapsed,
+                    trackingItems = adviceState.trackingItems,
+                    onMarkHelpful = onMarkHelpful,
+                    onMarkNotHelpful = onMarkNotHelpful
                 )
                 adviceState.errorMessage != null -> AdviceErrorCard(adviceState.errorMessage, onRetry)
                 else -> AdviceInfoCard("完成基础问题后，我会立刻生成个性化建议。")
@@ -575,7 +725,10 @@ private fun AdviceResultCard(
     payload: AdvicePayload,
     generatedAt: Long?,
     isFallback: Boolean,
-    isCollapsed: Boolean
+    isCollapsed: Boolean,
+    trackingItems: List<AdviceTrackingEntity>,
+    onMarkHelpful: () -> Unit,
+    onMarkNotHelpful: () -> Unit
 ) {
     Card {
         val scrollState = rememberScrollState()
@@ -608,6 +761,55 @@ private fun AdviceResultCard(
                 if (payload.redFlags.isNotEmpty()) {
                     AdviceListBlock(title = "提醒", items = payload.redFlags)
                 }
+                
+                // Phase 3: 反馈按钮
+                val hasFeedback = trackingItems.any { 
+                    it.userFeedback != null && it.userFeedback.isNotBlank()
+                }
+                if (!hasFeedback) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "这些建议有帮助吗？",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        IconButton(onClick = onMarkHelpful, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.ThumbUp,
+                                contentDescription = "有帮助",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        IconButton(onClick = onMarkNotHelpful, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.ThumbDown,
+                                contentDescription = "无帮助",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val feedback = trackingItems.firstOrNull()?.userFeedback
+                    Text(
+                        text = when(feedback) {
+                            UserFeedback.HELPFUL -> "✓ 已标记为有帮助"
+                            UserFeedback.NOT_HELPFUL -> "✓ 已标记为无帮助"
+                            UserFeedback.EXECUTED -> "✓ 已执行"
+                            else -> ""
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
             }
         }
     }
@@ -616,14 +818,13 @@ private fun AdviceResultCard(
 @Composable
 private fun AdviceListBlock(title: String, items: List<String>) {
     if (items.isEmpty()) return
-    val palette = rememberReportPalette()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(text = title, style = MaterialTheme.typography.titleSmall, color = palette.textPrimary)
+        Text(text = title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
         items.forEach { item ->
             Text(
                 text = "• $item",
                 style = MaterialTheme.typography.bodyMedium,
-                color = palette.textPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -636,69 +837,4 @@ private fun formatTimestamp(epochMillis: Long): String {
     return "${local.monthValue}月${local.dayOfMonth}日 ${local.hour}:${local.minute.toString().padStart(2, '0')}"
 }
 
-@Composable
-private fun GlowCard(
-    glowBrush: Brush,
-    shape: Shape,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .background(glowBrush, shape = shape)
-            .padding(1.5.dp)
-    ) {
-        Box(modifier = Modifier.clip(shape)) {
-            content()
-        }
-    }
-}
 
-@Composable
-private fun rememberReportPalette(): ReportPalette {
-    val colorScheme = MaterialTheme.colorScheme
-    val isDark = colorScheme.background.luminance() < 0.5f
-    return if (isDark) {
-        ReportPalette(
-            background = Brush.verticalGradient(listOf(Color(0xFF0C101C), Color(0xFF0A0D18))),
-            card = Color(0xFF141B2C),
-            cardElevated = Color(0xFF11182A),
-            accentPrimary = Color(0xFF4E7DFF),
-            accentSecondary = Color(0xFF7C5CFF),
-            textPrimary = Color(0xFFE7ECF7),
-            textSecondary = Color(0xFF9FB2DA),
-            badgeBackground = Color(0xFF4E7DFF).copy(alpha = 0.18f),
-            chipBorder = Color(0xFF2C3650),
-            sliderInactive = Color(0xFF1F2740),
-            cardStroke = Color(0xFF2C3650)
-        )
-    } else {
-        ReportPalette(
-            background = Brush.verticalGradient(listOf(colorScheme.surfaceVariant, colorScheme.surface)),
-            card = colorScheme.surfaceVariant,
-            cardElevated = colorScheme.surfaceVariant.copy(alpha = 0.9f),
-            accentPrimary = colorScheme.primary,
-            accentSecondary = colorScheme.secondary,
-            textPrimary = colorScheme.onSurface,
-            textSecondary = colorScheme.onSurfaceVariant,
-            badgeBackground = colorScheme.primary.copy(alpha = 0.12f),
-            chipBorder = colorScheme.outlineVariant,
-            sliderInactive = colorScheme.surfaceVariant,
-            cardStroke = colorScheme.outlineVariant
-        )
-    }
-}
-
-private data class ReportPalette(
-    val background: Brush,
-    val card: Color,
-    val cardElevated: Color,
-    val accentPrimary: Color,
-    val accentSecondary: Color,
-    val textPrimary: Color,
-    val textSecondary: Color,
-    val badgeBackground: Color,
-    val chipBorder: Color,
-    val sliderInactive: Color,
-    val cardStroke: Color
-)

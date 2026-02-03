@@ -9,18 +9,24 @@ import com.heldairy.core.database.entity.InsightReportEntity
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.flow.first
 
 class BackupManager(
     private val repository: DailyReportRepository,
     private val insightRepository: InsightRepository,
+    private val medicationRepository: com.heldairy.feature.medication.MedicationRepository,
     private val json: Json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 ) {
     suspend fun exportJson(): String {
         val snapshots = repository.loadAllSnapshots()
+        val meds = medicationRepository.getAllMeds().first()
+        val medications = meds.map { it.toBackupMedication() }
+        
         val payload = BackupPayload(
             schemaVersion = SCHEMA_VERSION,
             entries = snapshots.map { it.toBackupEntry() },
-            insights = insightRepository.loadAllInsights().map { it.toBackupInsight() }
+            insights = insightRepository.loadAllInsights().map { it.toBackupInsight() },
+            medications = medications
         )
         return json.encodeToString(payload)
     }
@@ -82,7 +88,51 @@ class BackupManager(
                     )
                 )
             }
+            
+            // 恢复用药数据
+            payload.medications.forEach { backupMed ->
+                val medId = medicationRepository.addMed(
+                    name = backupMed.name,
+                    aliases = backupMed.aliases,
+                    note = backupMed.note,
+                    infoSummary = backupMed.infoSummary
+                )
+                
+                // 恢复疗程
+                backupMed.courses.forEach { backupCourse ->
+                    medicationRepository.addCourse(
+                        medId = medId,
+                        startDate = java.time.LocalDate.parse(backupCourse.startDate),
+                        endDate = backupCourse.endDate?.let { java.time.LocalDate.parse(it) },
+                        status = com.heldairy.feature.medication.CourseStatus.fromDbString(backupCourse.status),
+                        frequencyText = backupCourse.frequencyText,
+                        doseText = backupCourse.doseText,
+                        timeHints = backupCourse.timeHints
+                    )
+                }
+                
+                // 恢复提醒
+                backupMed.reminders.forEach { backupReminder ->
+                    medicationRepository.addReminder(
+                        medId = medId,
+                        hour = backupReminder.hour,
+                        minute = backupReminder.minute,
+                        repeatType = com.heldairy.feature.medication.RepeatType.valueOf(backupReminder.repeatType),
+                        weekDays = backupReminder.weekDays?.split(",")?.mapNotNull { it.toIntOrNull() },
+                        startDate = backupReminder.startDate?.let { java.time.LocalDate.parse(it) },
+                        endDate = backupReminder.endDate?.let { java.time.LocalDate.parse(it) },
+                        title = backupReminder.title,
+                        message = backupReminder.message
+                    )
+                }
+            }
         }
+    }
+
+    suspend fun clearAllData() {
+        repository.clearAll()
+        insightRepository.clearAll()
+        medicationRepository.clearAll()
     }
 
     private fun DailyEntrySnapshot.toBackupEntry(): BackupEntry {
@@ -132,9 +182,57 @@ class BackupManager(
         )
     }
 
+    private suspend fun com.heldairy.feature.medication.Med.toBackupMedication(): BackupMedication {
+        val courses = medicationRepository.getCoursesByMedId(this.id).first()
+        val reminders = medicationRepository.getRemindersByMedId(this.id).first()
+        
+        return BackupMedication(
+            id = this.id,
+            name = this.name,
+            aliases = this.aliases,
+            note = this.note,
+            infoSummary = this.infoSummary,
+            createdAt = this.createdAt.toEpochDay() * 86400000L, // LocalDate to millis
+            updatedAt = this.updatedAt.toEpochDay() * 86400000L,
+            courses = courses.map { it.toBackupCourse() },
+            reminders = reminders.map { it.toBackupReminder() }
+        )
+    }
+    
+    private fun com.heldairy.feature.medication.MedCourse.toBackupCourse(): BackupCourse {
+        return BackupCourse(
+            id = this.id,
+            medId = this.medId,
+            startDate = this.startDate.toString(),
+            endDate = this.endDate?.toString(),
+            status = this.status.toDbString(),
+            frequencyText = this.frequencyText,
+            doseText = this.doseText,
+            timeHints = this.timeHints
+        )
+    }
+    
+    private fun com.heldairy.feature.medication.MedicationReminder.toBackupReminder(): BackupReminder {
+        return BackupReminder(
+            id = this.id,
+            medId = this.medId,
+            hour = this.hour,
+            minute = this.minute,
+            repeatType = this.repeatType.name,
+            weekDays = this.weekDays?.joinToString(","),
+            startDate = this.startDate?.toString(),
+            endDate = this.endDate?.toString(),
+            enabled = this.enabled,
+            title = this.title,
+            message = this.message,
+            createdAt = this.createdAt,
+            updatedAt = this.updatedAt
+        )
+    }
+
     companion object {
-        private const val SCHEMA_VERSION = 2
-        private val supportedSchemas = setOf(1, 2)
+        private const val SCHEMA_VERSION = 3
+        private val supportedSchemas = setOf(1, 2, 3)
     }
 }
 

@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
 import com.heldairy.core.data.BackupManager
 import com.heldairy.core.preferences.AiPreferencesStore
+import com.heldairy.core.preferences.UserProfileStore
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -20,6 +21,7 @@ import androidx.lifecycle.viewModelScope
 
 class SettingsViewModel(
     private val preferencesStore: AiPreferencesStore,
+    private val userProfileStore: UserProfileStore,
     private val backupManager: BackupManager
 ) : ViewModel() {
 
@@ -40,6 +42,11 @@ class SettingsViewModel(
                         aiEnabled = settings.aiEnabled
                     )
                 }
+            }
+        }
+        viewModelScope.launch {
+            userProfileStore.profileFlow.collectLatest { profile ->
+                _uiState.update { it.copy(userName = profile.userName, avatarUri = profile.avatarUri) }
             }
         }
     }
@@ -71,17 +78,39 @@ class SettingsViewModel(
             _events.emit(SettingsEvent.Snackbar("API Key 已清除"))
         }
     }
+    
+    fun onUserNameChanged(name: String) {
+        _uiState.update { it.copy(userName = name) }
+    }
+    
+    fun saveUserName() {
+        val name = _uiState.value.userName
+        viewModelScope.launch {
+            userProfileStore.updateUserName(name)
+            _events.emit(SettingsEvent.Snackbar("用户名已更新"))
+        }
+    }
+    
+    fun updateAvatar(uri: String?) {
+        viewModelScope.launch {
+            userProfileStore.updateAvatar(uri)
+            _events.emit(SettingsEvent.Snackbar("头像已更新"))
+        }
+    }
 
     suspend fun exportJson(): Result<String> {
         return runCatching { backupManager.exportJson() }
     }
 
-    suspend fun exportCsv(): Result<String> {
-        return runCatching { backupManager.exportCsv() }
-    }
-
     suspend fun importJson(raw: String): Result<Unit> {
         return backupManager.importJson(raw)
+    }
+
+    fun clearAllData() {
+        viewModelScope.launch {
+            backupManager.clearAllData()
+            _events.emit(SettingsEvent.Snackbar("所有数据已清空"))
+        }
     }
 
     fun showMessage(message: String) {
@@ -96,6 +125,7 @@ class SettingsViewModel(
                 val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HElDairyApplication)
                 SettingsViewModel(
                     preferencesStore = app.appContainer.aiPreferencesStore,
+                    userProfileStore = app.appContainer.userProfileStore,
                     backupManager = app.appContainer.backupManager
                 )
             }
@@ -107,6 +137,8 @@ data class SettingsUiState(
     val apiKeyInput: String = "",
     val lastSavedApiKey: String = "",
     val aiEnabled: Boolean = true,
+    val userName: String = "健康日记用户",
+    val avatarUri: String? = null,
     val isSaving: Boolean = false
 ) {
     val isApiKeyDirty: Boolean get() = apiKeyInput != lastSavedApiKey

@@ -8,10 +8,12 @@ import com.heldairy.core.database.entity.DailyEntryWithResponses
 import com.heldairy.core.database.entity.DailySummaryEntity
 import com.heldairy.core.database.entity.QuestionResponseEntity
 import com.heldairy.core.database.entity.InsightReportEntity
+import com.heldairy.core.database.entity.AdviceTrackingEntity
 import java.time.Clock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -21,6 +23,8 @@ import org.junit.Test
 
 class BackupManagerTest {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
+    private val fakeMedicationDao = FakeMedicationDao()
+    private val fakeMedicationRepo = com.heldairy.feature.medication.MedicationRepository(fakeMedicationDao)
 
     @Test
     fun exportThenImportRestoresSnapshots() = runBlocking {
@@ -33,7 +37,7 @@ class BackupManagerTest {
             ioDispatcher = Dispatchers.Unconfined,
             json = json
         )
-        val manager = BackupManager(sourceRepo, sourceInsightRepo, json)
+        val manager = BackupManager(sourceRepo, sourceInsightRepo, fakeMedicationRepo, json)
 
         val entryId = sourceRepo.recordDailyReport(
             entryDate = "2026-01-14",
@@ -89,7 +93,7 @@ class BackupManagerTest {
             ioDispatcher = Dispatchers.Unconfined,
             json = json
         )
-        val targetManager = BackupManager(targetRepo, targetInsightRepo, json)
+        val targetManager = BackupManager(targetRepo, targetInsightRepo, fakeMedicationRepo, json)
 
         val result = targetManager.importJson(exported)
         assertTrue(result.isSuccess)
@@ -119,7 +123,7 @@ class BackupManagerTest {
             ioDispatcher = Dispatchers.Unconfined,
             json = json
         )
-        val manager = BackupManager(repo, insightRepo, json)
+        val manager = BackupManager(repo, insightRepo, fakeMedicationRepo, json)
 
         repo.recordDailyReport(
             entryDate = "2026-01-10",
@@ -235,6 +239,13 @@ private class FakeDailyReportDao : DailyReportDao {
 
     override fun observeLatestEntry(): Flow<DailyEntryWithResponses?> = latestEntryFlow
 
+    override fun observeEntriesInRange(startDate: String, endDate: String): Flow<List<DailyEntryWithResponses>> {
+        return flowOf(
+            entries.filter { it.entryDate >= startDate && it.entryDate <= endDate }
+                .map { entry -> DailyEntryWithResponses(entry, responses.filter { it.entryId == entry.id }) }
+        )
+    }
+
     override fun observeLatestSnapshot(): Flow<DailyEntrySnapshot?> = latestSnapshotFlow
 
     override suspend fun loadRecentEntries(limit: Int): List<DailyEntryWithResponses> {
@@ -289,6 +300,10 @@ private class FakeDailyReportDao : DailyReportDao {
         insights.clear()
     }
 
+    override suspend fun clearAllInsights() {
+        insights.clear()
+    }
+
     override suspend fun clearResponses() {
         responses.clear()
         refreshLatest()
@@ -298,6 +313,18 @@ private class FakeDailyReportDao : DailyReportDao {
         entries.clear()
         refreshLatest()
     }
+
+    // Phase 2: Advice Tracking methods
+    override suspend fun insertAdviceTracking(tracking: AdviceTrackingEntity): Long = 0L
+    override suspend fun insertAdviceTrackings(trackings: List<AdviceTrackingEntity>) {}
+    override suspend fun updateAdviceTracking(tracking: AdviceTrackingEntity) {}
+    override suspend fun getTrackingsForEntry(entryId: Long): List<AdviceTrackingEntity> = emptyList()
+    override suspend fun getTrackingsInDateRange(startDate: String, endDate: String): List<AdviceTrackingEntity> = emptyList()
+    override suspend fun getTrackingsByFeedback(feedback: String, limit: Int): List<AdviceTrackingEntity> = emptyList()
+    override suspend fun getExecutedWithScore(limit: Int): List<AdviceTrackingEntity> = emptyList()
+    override suspend fun getTrackingsByCategory(category: String, limit: Int): List<AdviceTrackingEntity> = emptyList()
+    override suspend fun deleteTrackingsForEntry(entryId: Long) {}
+    override suspend fun clearAllTrackings() {}
 
     private fun responsesFor(entryId: Long): List<QuestionResponseEntity> {
         return responses.filter { it.entryId == entryId }.sortedBy { it.questionOrder }
@@ -316,4 +343,35 @@ private class FakeDailyReportDao : DailyReportDao {
             )
         }
     }
+}
+
+private class FakeMedicationDao : com.heldairy.core.database.MedicationDao {
+    override suspend fun insertMed(med: com.heldairy.core.database.entity.MedEntity): Long = 0L
+    override suspend fun updateMed(med: com.heldairy.core.database.entity.MedEntity) {}
+    override suspend fun deleteMed(med: com.heldairy.core.database.entity.MedEntity) {}
+    override fun getAllMeds(): Flow<List<com.heldairy.core.database.entity.MedEntity>> = MutableStateFlow(emptyList())
+    override suspend fun getMedById(medId: Long): com.heldairy.core.database.entity.MedEntity? = null
+    override fun getAllMedsWithCourses(): Flow<List<com.heldairy.core.database.entity.MedWithCourses>> = MutableStateFlow(emptyList())
+    override suspend fun getMedWithCoursesById(medId: Long): com.heldairy.core.database.entity.MedWithCourses? = null
+    override suspend fun insertCourse(course: com.heldairy.core.database.entity.MedCourseEntity): Long = 0L
+    override suspend fun updateCourse(course: com.heldairy.core.database.entity.MedCourseEntity) {}
+    override suspend fun deleteCourse(course: com.heldairy.core.database.entity.MedCourseEntity) {}
+    override fun getCoursesByMedId(medId: Long): Flow<List<com.heldairy.core.database.entity.MedCourseEntity>> = MutableStateFlow(emptyList())
+    override suspend fun getCourseById(courseId: Long): com.heldairy.core.database.entity.MedCourseEntity? = null
+    override fun getCoursesByStatus(status: String): Flow<List<com.heldairy.core.database.entity.MedCourseEntity>> = MutableStateFlow(emptyList())
+    override fun getActiveMeds(): Flow<List<com.heldairy.core.database.entity.MedEntity>> = MutableStateFlow(emptyList())
+    override suspend fun insertEvent(event: com.heldairy.core.database.entity.MedEventEntity): Long = 0L
+    override fun getRecentEvents(limit: Int): Flow<List<com.heldairy.core.database.entity.MedEventEntity>> = MutableStateFlow(emptyList())
+    override suspend fun getEventById(eventId: Long): com.heldairy.core.database.entity.MedEventEntity? = null
+    override suspend fun insertReminder(reminder: com.heldairy.core.database.entity.MedicationReminderEntity): Long = 0L
+    override suspend fun updateReminder(reminder: com.heldairy.core.database.entity.MedicationReminderEntity) {}
+    override suspend fun deleteReminder(reminderId: Long) {}
+    override fun getRemindersByMedId(medId: Long): Flow<List<com.heldairy.core.database.entity.MedicationReminderEntity>> = MutableStateFlow(emptyList())
+    override suspend fun getReminderById(reminderId: Long): com.heldairy.core.database.entity.MedicationReminderEntity? = null
+    override fun getAllEnabledReminders(): Flow<List<com.heldairy.core.database.entity.MedicationReminderEntity>> = MutableStateFlow(emptyList())
+    override suspend fun updateReminderEnabled(reminderId: Long, enabled: Boolean, updatedAt: Long) {}
+    override suspend fun clearAllReminders() {}
+    override suspend fun clearAllEvents() {}
+    override suspend fun clearAllCourses() {}
+    override suspend fun clearAllMeds() {}
 }

@@ -15,17 +15,27 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.heldairy.ui.theme.Spacing
+import com.heldairy.ui.theme.CornerRadius
+import com.heldairy.ui.theme.Elevation
+import com.heldairy.ui.theme.success
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Medication
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +54,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.heldairy.feature.medication.Med
+import com.heldairy.feature.medication.MedFilterStatus
+import com.heldairy.feature.medication.MedSortBy
 import com.heldairy.feature.medication.MedicationListUiState
 import com.heldairy.feature.medication.MedicationListViewModel
 import com.heldairy.ui.theme.HElDairyTheme
@@ -51,12 +63,18 @@ import com.heldairy.ui.theme.HElDairyTheme
 @Composable
 fun MedicationListRoute(
     paddingValues: PaddingValues,
-    onMedClick: (Long) -> Unit = {}
+    onMedClick: (Long) -> Unit = {},
+    onAddClick: () -> Unit = {}
 ) {
     val isPreview = LocalInspectionMode.current
     if (isPreview) {
         val previewState = MedicationListUiState(
             meds = listOf(
+                Med(id = 1, name = "阿莫西林", hasActiveCourse = true),
+                Med(id = 2, name = "布洛芬", hasActiveCourse = false),
+                Med(id = 3, name = "维生素C", hasActiveCourse = true)
+            ),
+            displayedMeds = listOf(
                 Med(id = 1, name = "阿莫西林", hasActiveCourse = true),
                 Med(id = 2, name = "布洛芬", hasActiveCourse = false),
                 Med(id = 3, name = "维生素C", hasActiveCourse = true)
@@ -67,7 +85,10 @@ fun MedicationListRoute(
             paddingValues = paddingValues,
             uiState = previewState,
             onMedClick = onMedClick,
-            onAddMed = {}
+            onAddMed = {},
+            onSearchQueryChange = {},
+            onFilterStatusChange = {},
+            onSortByChange = {}
         )
         return
     }
@@ -75,24 +96,15 @@ fun MedicationListRoute(
     val viewModel: MedicationListViewModel = viewModel(factory = MedicationListViewModel.Factory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    var showAddDialog by remember { mutableStateOf(false) }
-
     MedicationListScreen(
         paddingValues = paddingValues,
         uiState = uiState,
         onMedClick = onMedClick,
-        onAddMed = { showAddDialog = true }
+        onAddMed = onAddClick,
+        onSearchQueryChange = viewModel::onSearchQueryChange,
+        onFilterStatusChange = viewModel::onFilterStatusChange,
+        onSortByChange = viewModel::onSortByChange
     )
-
-    if (showAddDialog) {
-        AddMedicationDialog(
-            onDismiss = { showAddDialog = false },
-            onConfirm = { name, startDate, frequency, dose, timeHints ->
-                viewModel.addNewMed(name, startDate, frequency, dose, timeHints)
-                showAddDialog = false
-            }
-        )
-    }
 }
 
 @Composable
@@ -100,9 +112,13 @@ private fun MedicationListScreen(
     paddingValues: PaddingValues,
     uiState: MedicationListUiState,
     onMedClick: (Long) -> Unit,
-    onAddMed: () -> Unit
+    onAddMed: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onFilterStatusChange: (MedFilterStatus) -> Unit,
+    onSortByChange: (MedSortBy) -> Unit
 ) {
     Scaffold(
+        modifier = Modifier.padding(paddingValues),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddMed,
@@ -115,19 +131,69 @@ private fun MedicationListScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
                 .padding(innerPadding)
         ) {
-            Box(
+            // 搜索框
+            OutlinedTextField(
+                value = uiState.searchQuery,
+                onValueChange = onSearchQueryChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 20.dp)
+                    .padding(horizontal = Spacing.M),
+                placeholder = { Text("搜索药品名称或别名") },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = "搜索")
+                },
+                singleLine = true
+            )
+
+            Spacer(Modifier.height(Spacing.S))
+
+            // 统计卡片
+            MedicationStatsCard(
+                stats = uiState.stats,
+                modifier = Modifier.padding(horizontal = Spacing.M)
+            )
+
+            Spacer(Modifier.height(Spacing.S))
+
+            // 筛选chips
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = Spacing.M),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.XS)
             ) {
-                Text(
-                    text = "用药管理",
-                    style = MaterialTheme.typography.headlineMedium
-                )
+                item {
+                    FilterChip(
+                        selected = uiState.filterStatus == MedFilterStatus.ALL,
+                        onClick = { onFilterStatusChange(MedFilterStatus.ALL) },
+                        label = { Text("全部") }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = uiState.filterStatus == MedFilterStatus.ACTIVE,
+                        onClick = { onFilterStatusChange(MedFilterStatus.ACTIVE) },
+                        label = { Text("正在服用") }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = uiState.filterStatus == MedFilterStatus.PAUSED,
+                        onClick = { onFilterStatusChange(MedFilterStatus.PAUSED) },
+                        label = { Text("已暂停") }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = uiState.filterStatus == MedFilterStatus.ENDED,
+                        onClick = { onFilterStatusChange(MedFilterStatus.ENDED) },
+                        label = { Text("已结束") }
+                    )
+                }
             }
+
+            Spacer(Modifier.height(Spacing.M))
 
             when {
                 uiState.isLoading -> {
@@ -138,16 +204,32 @@ private fun MedicationListScreen(
                         Text("加载中...", style = MaterialTheme.typography.bodyLarge)
                     }
                 }
-                uiState.meds.isEmpty() -> {
-                    EmptyMedicationState()
+                uiState.displayedMeds.isEmpty() -> {
+                    if (uiState.searchQuery.isNotBlank() || uiState.filterStatus != MedFilterStatus.ALL) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "无符合条件的药品",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        EmptyMedicationState()
+                    }
                 }
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        contentPadding = PaddingValues(horizontal = Spacing.M, vertical = Spacing.XS),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.S)
                     ) {
-                        items(uiState.meds) { med ->
+                        items(
+                            items = uiState.displayedMeds,
+                            key = { it.id }  // 优化重组性能
+                        ) { med ->
                             MedicationCard(
                                 med = med,
                                 onClick = { onMedClick(med.id) }
@@ -171,7 +253,7 @@ private fun EmptyMedicationState() {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(Spacing.S)
         ) {
             Icon(
                 imageVector = Icons.Outlined.Medication,
@@ -199,7 +281,7 @@ private fun MedicationCard(
     onClick: () -> Unit
 ) {
     val statusColor = if (med.hasActiveCourse) {
-        Color(0xFF2EA27C)
+        MaterialTheme.colorScheme.success
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
     }
@@ -209,14 +291,15 @@ private fun MedicationCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.Low)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(Spacing.M),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -234,7 +317,7 @@ private fun MedicationCard(
                 )
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(Spacing.M))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(

@@ -16,7 +16,11 @@ import java.time.LocalDate
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("medId"), Index("status")]
+    indices = [
+        Index("medId"),
+        Index("status"),
+        Index("startDate")  // 优化日期范围查询性能
+    ]
 )
 data class MedCourseEntity(
     @PrimaryKey(autoGenerate = true)

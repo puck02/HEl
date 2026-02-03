@@ -5,6 +5,8 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
+import com.heldairy.core.database.entity.AdviceTrackingEntity
 import com.heldairy.core.database.entity.DailyAdviceEntity
 import com.heldairy.core.database.entity.DailyEntryEntity
 import com.heldairy.core.database.entity.DailyEntrySnapshot
@@ -83,6 +85,10 @@ interface DailyReportDao {
     suspend fun getEntryWithResponses(entryId: Long): DailyEntryWithResponses?
 
     @Transaction
+    @Query("SELECT * FROM daily_entries WHERE entry_date >= :startDate AND entry_date <= :endDate ORDER BY entry_date ASC")
+    fun observeEntriesInRange(startDate: String, endDate: String): Flow<List<DailyEntryWithResponses>>
+
+    @Transaction
     @Query("SELECT * FROM daily_entries ORDER BY created_at DESC")
     suspend fun loadAllSnapshots(): List<DailyEntrySnapshot>
 
@@ -95,9 +101,59 @@ interface DailyReportDao {
     @Query("DELETE FROM insight_reports")
     suspend fun clearInsights()
 
+    @Query("DELETE FROM insight_reports")
+    suspend fun clearAllInsights()
+
     @Query("DELETE FROM question_responses")
     suspend fun clearResponses()
 
     @Query("DELETE FROM daily_entries")
     suspend fun clearEntries()
+    
+    // ========== 阶段2：建议追踪DAO方法 ==========
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAdviceTracking(tracking: AdviceTrackingEntity): Long
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAdviceTrackings(trackings: List<AdviceTrackingEntity>)
+    
+    @Update
+    suspend fun updateAdviceTracking(tracking: AdviceTrackingEntity)
+    
+    @Query("SELECT * FROM advice_tracking WHERE entry_id = :entryId ORDER BY id")
+    suspend fun getTrackingsForEntry(entryId: Long): List<AdviceTrackingEntity>
+    
+    @Query("""
+        SELECT * FROM advice_tracking 
+        WHERE generated_date >= :startDate AND generated_date <= :endDate
+        ORDER BY generated_date DESC, id
+    """)
+    suspend fun getTrackingsInDateRange(startDate: String, endDate: String): List<AdviceTrackingEntity>
+    
+    @Query("""
+        SELECT * FROM advice_tracking 
+        WHERE user_feedback = :feedback
+        ORDER BY generated_date DESC
+        LIMIT :limit
+    """)
+    suspend fun getTrackingsByFeedback(feedback: String, limit: Int = 20): List<AdviceTrackingEntity>
+    
+    @Query("""
+        SELECT * FROM advice_tracking 
+        WHERE user_feedback = 'executed' AND effectiveness_score IS NOT NULL
+        ORDER BY feedback_at DESC
+        LIMIT :limit
+    """)
+    suspend fun getExecutedWithScore(limit: Int = 10): List<AdviceTrackingEntity>
+    
+    // 删除有问题的getCategoryStats方法，改为简单查询
+    @Query("SELECT * FROM advice_tracking WHERE category = :category LIMIT :limit")
+    suspend fun getTrackingsByCategory(category: String, limit: Int = 20): List<AdviceTrackingEntity>
+    
+    @Query("DELETE FROM advice_tracking WHERE entry_id = :entryId")
+    suspend fun deleteTrackingsForEntry(entryId: Long)
+    
+    @Query("DELETE FROM advice_tracking")
+    suspend fun clearAllTrackings()
 }

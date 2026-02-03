@@ -368,8 +368,9 @@ M8：用药自然语言解析（DeepSeek）
 - JSON 校验与失败处理
 - ./gradlew build 通过
 
-M9：拍照 OCR + 摘要提取
-- 拍照/选图 -> OCR -> DeepSeek 摘要
-- 写入 Med.infoSummary
-- ./gradlew build 通过
+M9：健康报表导出（PDF）
+- 基于洞察页数据生成医生报表 PDF
+
+
+
 

@@ -4,12 +4,18 @@ import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,7 +25,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import com.heldairy.ui.theme.Spacing
+import com.heldairy.ui.theme.CornerRadius
+import com.heldairy.ui.theme.Elevation
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.DeleteSweep
@@ -28,6 +38,7 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,14 +61,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.heldairy.feature.settings.SettingsEvent
 import com.heldairy.feature.settings.SettingsUiState
@@ -91,25 +105,6 @@ fun SettingsRoute(
                         val writeResult = writeTextToUri(context, uri, content)
                         if (writeResult.isSuccess) {
                             viewModel.showMessage("JSON 导出完成")
-                        } else {
-                            viewModel.showMessage(writeResult.exceptionOrNull()?.message ?: "导出失败")
-                        }
-                    }
-                    .onFailure { viewModel.showMessage(it.message ?: "导出失败") }
-            }
-        }
-    }
-
-    val exportCsvLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                viewModel.exportCsv()
-                    .onSuccess { content ->
-                        val writeResult = writeTextToUri(context, uri, content)
-                        if (writeResult.isSuccess) {
-                            viewModel.showMessage("CSV 导出完成")
                         } else {
                             viewModel.showMessage(writeResult.exceptionOrNull()?.message ?: "导出失败")
                         }
@@ -157,9 +152,12 @@ fun SettingsRoute(
             onSaveApiKey = viewModel::saveApiKey,
             onClearApiKey = viewModel::clearApiKey,
             onAiEnabledChanged = viewModel::onAiEnabledChanged,
+            onUserNameChanged = viewModel::onUserNameChanged,
+            onSaveUserName = viewModel::saveUserName,
+            onAvatarSelected = { uri -> viewModel.updateAvatar(uri?.toString()) },
             onExportJson = { exportJsonLauncher.launch(defaultBackupFileName("json")) },
-            onExportCsv = { exportCsvLauncher.launch(defaultBackupFileName("csv")) },
             onImportJson = { importJsonLauncher.launch("application/json") },
+            onClearAllData = { viewModel.clearAllData() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
@@ -175,32 +173,52 @@ fun SettingsScreen(
     onSaveApiKey: () -> Unit,
     onClearApiKey: () -> Unit,
     onAiEnabledChanged: (Boolean) -> Unit,
+    onUserNameChanged: (String) -> Unit,
+    onSaveUserName: () -> Unit,
+    onAvatarSelected: (Uri?) -> Unit,
     onExportJson: () -> Unit,
-    onExportCsv: () -> Unit,
     onImportJson: () -> Unit,
+    onClearAllData: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
     var showApiKey by remember { mutableStateOf(false) }
+    var showClearDataDialog by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+            .padding(
+                start = Spacing.M,
+                end = Spacing.M,
+                top = Spacing.L,
+                bottom = Spacing.M
+            ),
+        verticalArrangement = Arrangement.spacedBy(Spacing.M)
     ) {
+        // 用户信息卡片
+        ProfileCard(
+            userName = state.userName,
+            avatarUri = state.avatarUri,
+            onUserNameChanged = onUserNameChanged,
+            onSaveUserName = onSaveUserName,
+            onAvatarSelected = onAvatarSelected
+        )
+        
         Card(
-            colors = CardDefaults.cardColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(24.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            ),
+            shape = RoundedCornerShape(CornerRadius.Medium),
+            elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(Spacing.M),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.S)
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = "启用 AI 管家", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
@@ -217,12 +235,14 @@ fun SettingsScreen(
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
             Text(text = "API Key", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
             Card(
-                colors = CardDefaults.cardColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(20.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                ),
+                shape = RoundedCornerShape(CornerRadius.Medium),
+                elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 OutlinedTextField(
@@ -230,7 +250,7 @@ fun SettingsScreen(
                     onValueChange = onApiKeyChanged,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                        .padding(horizontal = Spacing.S, vertical = Spacing.XS),
                     visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
                     placeholder = { Text("••••••••••••••••••••••••••••••••") },
                     trailingIcon = {
@@ -243,11 +263,12 @@ fun SettingsScreen(
                         }
                     },
                     singleLine = true,
+                    shape = RoundedCornerShape(CornerRadius.Medium),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
                         unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
-                        unfocusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                        focusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                        focusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
                         cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
                     )
                 )
@@ -261,34 +282,93 @@ fun SettingsScreen(
             InfoCard(text = "API Key 仅保存在本地，可随时清除。关闭 AI 后仍可保留历史记录。您的隐私对我们至关重要。")
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
             Text(text = "数据备份", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
             Text(
                 text = "导出包含所有日报、回答、建议与总结，导入会覆盖当前数据。",
                 style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
                 color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                GradientButton(
-                    text = "导出 JSON",
-                    icon = Icons.Outlined.CloudUpload,
-                    onClick = onExportJson,
-                    modifier = Modifier.weight(1f)
-                )
-                GradientButton(
-                    text = "导出 CSV",
-                    icon = Icons.Outlined.CloudDownload,
-                    onClick = onExportCsv,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            OutlinedActionButton(
+            StandardButton(
+                text = "导出 JSON",
+                icon = Icons.Outlined.CloudUpload,
+                onClick = onExportJson,
+                modifier = Modifier.fillMaxWidth()
+            )
+            StandardButton(
                 text = "导入 JSON（覆盖）",
-                icon = Icons.Outlined.DeleteSweep,
+                icon = Icons.Outlined.CloudDownload,
                 onClick = onImportJson,
                 modifier = Modifier.fillMaxWidth()
             )
         }
+
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
+            Text(text = "数据管理", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+            Text(
+                text = "清空所有日报记录和用药记录，但会保留用户名、头像和 API Key。清空后数据无法恢复，建议先导出备份。",
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            OutlinedActionButton(
+                text = "清空所有数据",
+                icon = Icons.Outlined.DeleteSweep,
+                onClick = { showClearDataDialog = true },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+    
+    if (showClearDataDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showClearDataDialog = false },
+            icon = { 
+                Icon(
+                    imageVector = Icons.Outlined.DeleteSweep,
+                    contentDescription = null,
+                    tint = androidx.compose.material3.MaterialTheme.colorScheme.error
+                )
+            },
+            title = { Text("确认清空所有数据？") },
+            text = {
+                Column {
+                    Text("此操作将清空：")
+                    Text("• 所有日报记录及相关数据", style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                    Text("• 所有用药记录及提醒", style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "将保留：用户名、头像、API Key",
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "⚠️ 此操作无法撤销！建议先导出备份。",
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showClearDataDialog = false
+                        onClearAllData()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("确认清空")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDataDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 }
 
@@ -302,7 +382,7 @@ private fun ActionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = Spacing.S, vertical = Spacing.XS),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -319,14 +399,14 @@ private fun ActionRow(
 private fun InfoCard(text: String) {
     Card(
         colors = CardDefaults.cardColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)),
-        shape = RoundedCornerShape(18.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.padding(Spacing.M),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(Spacing.XS)
         ) {
             Box(
                 modifier = Modifier
@@ -346,34 +426,28 @@ private fun InfoCard(text: String) {
 }
 
 @Composable
-private fun GradientButton(
+private fun StandardButton(
     text: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(18.dp)
     Button(
         onClick = onClick,
         modifier = modifier.height(52.dp),
-        shape = shape,
-        contentPadding = PaddingValues(),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent)
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+            contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
+        ),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = Elevation.Low)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.horizontalGradient(listOf(Color(0xFF7C8BFF), Color(0xFF5D6BFF))),
-                    shape = shape
-                )
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            contentAlignment = Alignment.Center
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.XS)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(imageVector = icon, contentDescription = null, tint = Color.White)
-                Text(text = text, color = Color.White, fontWeight = FontWeight.SemiBold)
-            }
+            Icon(imageVector = icon, contentDescription = null)
+            Text(text = text, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -385,16 +459,131 @@ private fun OutlinedActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Button(
+    OutlinedButton(
         onClick = onClick,
         modifier = modifier.height(52.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = androidx.compose.material3.MaterialTheme.colorScheme.primary),
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
+        ),
         border = ButtonDefaults.outlinedButtonBorder
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.XS)
+        ) {
             Icon(imageVector = icon, contentDescription = null)
             Text(text = text, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun ProfileCard(
+    userName: String,
+    avatarUri: String?,
+    onUserNameChanged: (String) -> Unit,
+    onSaveUserName: () -> Unit,
+    onAvatarSelected: (Uri?) -> Unit
+) {
+    var isEditingName by remember { mutableStateOf(false) }
+    
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        onAvatarSelected(uri)
+    }
+    
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
+        Text(text = "用户信息", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            ),
+            shape = RoundedCornerShape(CornerRadius.Medium),
+            elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(Spacing.M),
+                verticalArrangement = Arrangement.spacedBy(Spacing.M)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.M),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                        androidx.compose.material3.MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
+                                    )
+                                ),
+                                shape = CircleShape
+                            )
+                            .clickable {
+                                imagePickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (avatarUri != null) {
+                            AsyncImage(
+                                model = avatarUri,
+                                contentDescription = "头像",
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "默认头像",
+                                modifier = Modifier.size(40.dp),
+                                tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (isEditingName) {
+                            OutlinedTextField(
+                                value = userName,
+                                onValueChange = onUserNameChanged,
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = androidx.compose.material3.MaterialTheme.typography.titleMedium
+                            )
+                        } else {
+                            Text(
+                                text = userName,
+                                style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        TextButton(onClick = { isEditingName = !isEditingName }) {
+                            Text(if (isEditingName) "取消" else "修改用户名")
+                        }
+                    }
+                }
+                
+                if (isEditingName) {
+                    Button(
+                        onClick = {
+                            onSaveUserName()
+                            isEditingName = false
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("保存")
+                    }
+                }
+            }
         }
     }
 }
@@ -427,3 +616,4 @@ private suspend fun readTextFromUri(context: Context, uri: Uri): Result<String> 
             } ?: error("无法读取文件")
         }
     }
+

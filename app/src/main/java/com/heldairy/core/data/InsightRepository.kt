@@ -59,4 +59,8 @@ class InsightRepository(
     suspend fun restoreInsight(report: InsightReportEntity) = withContext(ioDispatcher) {
         dao.upsertInsight(report)
     }
+
+    suspend fun clearAll() = withContext(ioDispatcher) {
+        dao.clearAllInsights()
+    }
 }
