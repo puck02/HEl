@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 data class UserProfile(
-    val userName: String = "Alex",
+    val userName: String = "Kitty宝贝",
     val avatarUri: String? = null
 )
 
@@ -25,7 +25,7 @@ class UserProfileStore(private val context: Context) {
     
     val profileFlow: Flow<UserProfile> = context.userProfileDataStore.data.map { preferences ->
         UserProfile(
-            userName = preferences[PreferenceKeys.USER_NAME] ?: "Alex",
+            userName = preferences[PreferenceKeys.USER_NAME] ?: "Kitty宝贝",
             avatarUri = preferences[PreferenceKeys.AVATAR_URI]
         )
     }

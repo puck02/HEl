@@ -128,6 +128,9 @@ import com.heldairy.ui.theme.accentPurple
 import com.heldairy.ui.theme.accentIndigo
 import com.heldairy.ui.theme.accentTeal
 import com.heldairy.ui.theme.accentPeach
+import com.heldairy.ui.theme.BowDecoration
+import com.heldairy.ui.theme.SmallBowDecoration
+import com.heldairy.ui.theme.KittyAvatar
 import com.heldairy.ui.theme.accentPurple
 import com.heldairy.ui.theme.accentIndigo
 import com.heldairy.ui.theme.accentTeal
@@ -286,6 +289,10 @@ private fun TabContent(paddingValues: PaddingValues, content: String) {
                 .fillMaxSize()
                 .padding(24.dp)
         ) {
+            Spacer(modifier = Modifier.weight(1f))
+            // 大号 Kitty 头像
+            KittyAvatar(size = 120.dp)
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = content,
                 style = MaterialTheme.typography.titleMedium,
@@ -296,6 +303,7 @@ private fun TabContent(paddingValues: PaddingValues, content: String) {
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center
             )
+            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }
@@ -389,11 +397,9 @@ private fun HeaderCard(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "默认头像",
-                        modifier = Modifier.size(IconSize.Large),  // 使用统一 IconSize
-                        tint = MaterialTheme.colorScheme.primary
+                    // Hello Kitty 默认头像
+                    KittyAvatar(
+                        size = IconSize.Hero
                     )
                 }
             }
@@ -637,6 +643,11 @@ private fun InsightsCTA(hasEntry: Boolean, onStartDaily: () -> Unit, onOpenInsig
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                Spacer(modifier = Modifier.weight(1f))
+                // Hello Kitty 蝴蝶结装饰
+                SmallBowDecoration(
+                    color = MaterialTheme.colorScheme.tertiary
+                )
             }
             Text(
                 text = "每周日更新 · 近 7 天 / 30 天趋势",
@@ -768,6 +779,15 @@ private fun MetricCard(
                 )
             }
             
+            // Hello Kitty 蝴蝶结装饰（右上角）
+            SmallBowDecoration(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(Spacing.S)
+                    .alpha(0.3f),
+                color = accentColor
+            )
+            
             Column(
                 verticalArrangement = Arrangement.spacedBy(Spacing.S),
                 modifier = Modifier
@@ -805,8 +825,14 @@ private fun MetricCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
+                        BowDecoration(
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                            size = 32.dp,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                        )
+                        Spacer(modifier = Modifier.height(Spacing.XS))
                         Text(
-                            text = "点击记录",
+                            text = "点击记录喵～",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary
                         )

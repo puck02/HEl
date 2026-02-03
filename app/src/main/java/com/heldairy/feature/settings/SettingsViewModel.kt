@@ -137,7 +137,7 @@ data class SettingsUiState(
     val apiKeyInput: String = "",
     val lastSavedApiKey: String = "",
     val aiEnabled: Boolean = true,
-    val userName: String = "健康日记用户",
+    val userName: String = "Kitty宝贝",
     val avatarUri: String? = null,
     val isSaving: Boolean = false
 ) {

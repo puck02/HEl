@@ -185,7 +185,7 @@ data class HomeDashboardUiState(
     val sleep: MetricDisplay? = null,
     val mood: MetricDisplay? = null,
     val energy: MetricDisplay? = null,
-    val userName: String = "Alex",
+    val userName: String = "Kitty宝贝",
     val avatarUri: String? = null
 )
 
