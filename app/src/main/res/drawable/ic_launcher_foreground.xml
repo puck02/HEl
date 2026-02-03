@@ -5,40 +5,33 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Heart base -->
+    <!-- Hello Kitty 蝴蝶结（红色）-->
+    <!-- 左侧蝴蝶结翅膀（心形） -->
     <path
-        android:fillColor="#F47B84"
-        android:strokeColor="#0F2A64"
-        android:strokeWidth="3"
-        android:strokeLineJoin="round"
-        android:strokeLineCap="round"
-        android:pathData="M54,18 C48,6 28,8 22,26 C17,41 24,60 54,82 C84,60 91,41 86,26 C80,8 60,6 54,18 Z" />
-
-    <!-- Left shading to echo original gradient -->
+        android:fillColor="#E4002B"
+        android:pathData="M36,26 C32,18 20,20 16,32 C13,42 18,54 36,70 C42,64 44,56 42,48 C40,40 38,34 36,26 Z" />
+    
+    <!-- 右侧蝴蝶结翅膀（心形） -->
     <path
-        android:fillColor="#E85E70"
-        android:pathData="M54,18 C48,6 28,8 22,26 C17,41 24,60 54,82 L54,18 Z" />
-
-    <!-- ECG line -->
+        android:fillColor="#E4002B"
+        android:pathData="M72,26 C76,18 88,20 92,32 C95,42 90,54 72,70 C66,64 64,56 66,48 C68,40 70,34 72,26 Z" />
+    
+    <!-- 蝴蝶结中心系结（圆形） -->
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#0F2A64"
-        android:strokeWidth="4"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M16,56 L30,56 L34,48 L42,72 L50,34 L58,72 L66,52 L80,52 L90,52" />
+        android:fillColor="#E4002B"
+        android:pathData="M54,48 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0" />
 
-    <!-- HEI lettering -->
-    <path android:fillColor="#0F2A64" android:pathData="M26,94 h6 v12 h-6 z" />
-    <path android:fillColor="#0F2A64" android:pathData="M38,94 h6 v12 h-6 z" />
-    <path android:fillColor="#0F2A64" android:pathData="M32,100 h6 v4 h-6 z" />
+    <!-- HEI 文字（Hello Kitty 粉色） -->
+    <path android:fillColor="#FF6B8A" android:pathData="M26,88 h6 v16 h-6 z" />
+    <path android:fillColor="#FF6B8A" android:pathData="M38,88 h6 v16 h-6 z" />
+    <path android:fillColor="#FF6B8A" android:pathData="M32,95 h6 v4 h-6 z" />
 
-    <path android:fillColor="#0F2A64" android:pathData="M50,94 h6 v12 h-6 z" />
-    <path android:fillColor="#0F2A64" android:pathData="M56,94 h10 v4 h-10 z" />
-    <path android:fillColor="#0F2A64" android:pathData="M56,100 h8 v4 h-8 z" />
-    <path android:fillColor="#0F2A64" android:pathData="M56,106 h10 v4 h-10 z" />
+    <path android:fillColor="#FF6B8A" android:pathData="M50,88 h6 v16 h-6 z" />
+    <path android:fillColor="#FF6B8A" android:pathData="M56,88 h10 v4 h-10 z" />
+    <path android:fillColor="#FF6B8A" android:pathData="M56,95 h8 v4 h-8 z" />
+    <path android:fillColor="#FF6B8A" android:pathData="M56,100 h10 v4 h-10 z" />
 
-    <path android:fillColor="#0F2A64" android:pathData="M74,94 h6 v12 h-6 z" />
-    <path android:fillColor="#0F2A64" android:pathData="M70,94 h14 v4 h-14 z" />
-    <path android:fillColor="#0F2A64" android:pathData="M70,102 h14 v4 h-14 z" />
+    <path android:fillColor="#FF6B8A" android:pathData="M74,88 h6 v16 h-6 z" />
+    <path android:fillColor="#FF6B8A" android:pathData="M70,88 h14 v4 h-14 z" />
+    <path android:fillColor="#FF6B8A" android:pathData="M70,96 h14 v4 h-14 z" />
 </vector>

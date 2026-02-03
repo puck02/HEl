@@ -292,7 +292,7 @@ private fun TabContent(paddingValues: PaddingValues, content: String) {
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "功能逐步上线中，生活管家会很快来到这里。",
+                text = "功能逐步上线中喵～生活管家会很快来到这里！",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center
             )
@@ -883,10 +883,10 @@ private fun MetricSpark(weeklyData: List<Float>) {
 }
 
 private fun greetingForHour(hour: Int): String = when (hour) {
-    in 5..11 -> "早上好"
-    in 12..13 -> "中午好"
-    in 14..17 -> "下午好"
-    else -> "晚上好"
+    in 5..11 -> "喵～早上好"
+    in 12..13 -> "喵～中午好"
+    in 14..17 -> "喵～下午好"
+    else -> "喵～晚上好"
 }
 
 @Composable

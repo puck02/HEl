@@ -87,11 +87,11 @@ fun ConfettiCanvas(
     modifier: Modifier = Modifier,
     progress: Float = 1f,
     colors: List<Color> = listOf(
-        Color(0xFFFFB347),  // 金橙
-        Color(0xFFFF7B7B),  // 珊瑚红
-        Color(0xFFFF6B9D),  // 玫瑰粉
-        Color(0xFF2DD4A0),  // 翠绿
-        Color(0xFF5BA8FF)   // 天蓝
+        Color(0xFFFF6B8A),  // Hello Kitty 粉
+        Color(0xFFFFD1DC),  // 浅粉
+        Color(0xFFFFFFFF),  // 白色
+        Color(0xFFE4002B),  // 蝴蝶结红
+        Color(0xFFFFE4D1)   // 蜜桃奶油
     )
 ) {
     Canvas(modifier = modifier) {
