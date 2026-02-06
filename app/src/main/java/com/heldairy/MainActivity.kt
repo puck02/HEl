@@ -133,10 +133,12 @@ import com.heldairy.ui.theme.SmallBowDecoration
 import com.heldairy.ui.theme.KittyAvatar
 import com.heldairy.ui.theme.KittyBackground
 import com.heldairy.ui.theme.BackgroundTheme
+import com.heldairy.ui.theme.StickerDecoration
 import com.heldairy.ui.theme.accentPurple
 import com.heldairy.ui.theme.accentIndigo
 import com.heldairy.ui.theme.accentTeal
 import com.heldairy.ui.theme.accentPeach
+import androidx.compose.foundation.layout.offset
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
@@ -330,6 +332,7 @@ private fun HeaderCard(
     val dayLine = carePrompt
     val dateText = now.format(DateTimeFormatter.ofPattern("M月d日 EEEE"))
 
+    Box(modifier = Modifier.fillMaxWidth()) {
     Card(
         colors = CardDefaults.cardColors(
             containerColor = Color.Transparent
@@ -461,6 +464,16 @@ private fun HeaderCard(
                 }
             }
         }
+    }
+    StickerDecoration(
+        drawableRes = R.drawable.bow,
+        size = 54.dp,
+        rotation = 20f,
+        alpha = 0.55f,
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .offset(x = 20.dp, y = (-20).dp)
+    )
     }
 }
 
@@ -647,9 +660,12 @@ private fun InsightsCTA(hasEntry: Boolean, onStartDaily: () -> Unit, onOpenInsig
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                // Hello Kitty 蝴蝶结装饰
-                SmallBowDecoration(
-                    color = MaterialTheme.colorScheme.tertiary
+                StickerDecoration(
+                    drawableRes = R.drawable.kitty01,
+                    size = 36.dp,
+                    rotation = -8f,
+                    alpha = 0.7f,
+                    modifier = Modifier.offset(y = (-2).dp)
                 )
             }
             Text(
@@ -828,10 +844,12 @@ private fun MetricCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        BowDecoration(
-                            modifier = Modifier.align(Alignment.CenterHorizontally),
-                            size = 32.dp,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                        StickerDecoration(
+                            drawableRes = R.drawable.cake01,
+                            size = 48.dp,
+                            rotation = -10f,
+                            alpha = 0.55f,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
                         )
                         Spacer(modifier = Modifier.height(Spacing.XS))
                         Text(

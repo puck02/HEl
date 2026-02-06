@@ -78,6 +78,9 @@ import com.heldairy.ui.theme.CornerRadius
 import com.heldairy.ui.theme.Elevation
 import com.heldairy.ui.theme.KittyBackground
 import com.heldairy.ui.theme.BackgroundTheme
+import com.heldairy.ui.theme.StickerDecoration
+import com.heldairy.R
+import androidx.compose.foundation.layout.offset
 import kotlinx.coroutines.flow.collectLatest
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -253,6 +256,7 @@ private fun DailyHeader(carePrompt: String) {
         else -> "晚安"
     }
 
+    Box(modifier = Modifier.fillMaxWidth()) {
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -299,6 +303,16 @@ private fun DailyHeader(carePrompt: String) {
                 )
             }
         }
+    }
+    StickerDecoration(
+        drawableRes = R.drawable.cake01,
+        size = 48.dp,
+        rotation = -12f,
+        alpha = 0.5f,
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .offset(x = 18.dp, y = (-14).dp)
+    )
     }
 }
 
@@ -641,8 +655,16 @@ private fun AdviceSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onToggleCollapse),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            StickerDecoration(
+                drawableRes = R.drawable.kitty03,
+                size = 42.dp,
+                rotation = 5f,
+                alpha = 0.75f,
+                modifier = Modifier.offset(x = (-4).dp)
+            )
             Text(
                 text = "Hello Kitty 今日建议",
                 style = MaterialTheme.typography.titleMedium,

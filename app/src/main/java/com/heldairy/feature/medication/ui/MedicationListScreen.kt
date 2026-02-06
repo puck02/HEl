@@ -25,6 +25,8 @@ import com.heldairy.ui.theme.Elevation
 import com.heldairy.ui.theme.success
 import com.heldairy.ui.theme.KittyBackground
 import com.heldairy.ui.theme.BackgroundTheme
+import com.heldairy.ui.theme.StickerDecoration
+import com.heldairy.R
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
@@ -259,11 +261,11 @@ private fun EmptyMedicationState() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.S)
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Medication,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            StickerDecoration(
+                drawableRes = R.drawable.kitty02,
+                size = 84.dp,
+                rotation = 0f,
+                alpha = 0.65f
             )
             Text(
                 text = "还没有添加药品",

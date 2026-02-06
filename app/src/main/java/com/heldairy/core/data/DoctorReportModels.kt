@@ -30,9 +30,22 @@ data class DataCompleteness(
     val completionRate: Double
 )
 
+/**
+ * 用药事件记录（用于PDF报表显示）
+ */
+data class MedicationEventForReport(
+    val date: String,        // 日期字符串，如 "2026-02-03"
+    val time: String,        // 时间字符串，如 "14:30"
+    val description: String  // 事件描述，如 "开始服用阿莫西林"
+)
+
+/**
+ * 扩展用药摘要，包含用药事件
+ */
 data class MedicationSummaryForReport(
     val activeMedications: List<ActiveMedication>,
-    val adherence: MedicationAdherenceSummary
+    val adherence: MedicationAdherenceSummary,
+    val events: List<MedicationEventForReport> = emptyList()
 )
 
 data class ActiveMedication(

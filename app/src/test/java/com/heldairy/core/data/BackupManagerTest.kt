@@ -363,6 +363,7 @@ private class FakeMedicationDao : com.heldairy.core.database.MedicationDao {
     override suspend fun insertEvent(event: com.heldairy.core.database.entity.MedEventEntity): Long = 0L
     override fun getRecentEvents(limit: Int): Flow<List<com.heldairy.core.database.entity.MedEventEntity>> = MutableStateFlow(emptyList())
     override suspend fun getEventById(eventId: Long): com.heldairy.core.database.entity.MedEventEntity? = null
+    override suspend fun getEventsInRange(startTime: Long, endTime: Long): List<com.heldairy.core.database.entity.MedEventEntity> = emptyList()
     override suspend fun insertReminder(reminder: com.heldairy.core.database.entity.MedicationReminderEntity): Long = 0L
     override suspend fun updateReminder(reminder: com.heldairy.core.database.entity.MedicationReminderEntity) {}
     override suspend fun deleteReminder(reminderId: Long) {}

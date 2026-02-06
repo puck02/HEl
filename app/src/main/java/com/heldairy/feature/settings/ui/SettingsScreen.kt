@@ -30,6 +30,8 @@ import com.heldairy.ui.theme.CornerRadius
 import com.heldairy.ui.theme.Elevation
 import com.heldairy.ui.theme.KittyBackground
 import com.heldairy.ui.theme.BackgroundTheme
+import com.heldairy.ui.theme.StickerDecoration
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.ui.res.painterResource
@@ -290,7 +292,19 @@ fun SettingsScreen(
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
-            Text(text = "数据备份", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.XS)
+            ) {
+                Text(text = "数据备份", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                StickerDecoration(
+                    drawableRes = R.drawable.strawberry,
+                    size = 32.dp,
+                    rotation = 12f,
+                    alpha = 0.55f,
+                    modifier = Modifier.offset(x = 4.dp, y = (-2).dp)
+                )
+            }
             Text(
                 text = "导出包含所有日报、回答、建议与总结，导入会覆盖当前数据。",
                 style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
@@ -503,6 +517,7 @@ private fun ProfileCard(
     
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
         Text(text = "用户信息", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+        Box(modifier = Modifier.fillMaxWidth()) {
         Card(
             colors = CardDefaults.cardColors(
                 containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
@@ -594,6 +609,16 @@ private fun ProfileCard(
                     }
                 }
             }
+        }
+        StickerDecoration(
+            drawableRes = R.drawable.cake02,
+            size = 46.dp,
+            rotation = -15f,
+            alpha = 0.5f,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = 16.dp, y = (-16).dp)
+        )
         }
     }
 }

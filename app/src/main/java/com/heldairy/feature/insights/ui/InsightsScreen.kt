@@ -33,6 +33,9 @@ import com.heldairy.ui.theme.warning
 import com.heldairy.ui.theme.semanticError
 import com.heldairy.ui.theme.KittyBackground
 import com.heldairy.ui.theme.BackgroundTheme
+import com.heldairy.ui.theme.StickerDecoration
+import com.heldairy.R
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.TrendingDown
 import androidx.compose.material.icons.automirrored.outlined.TrendingFlat
@@ -372,7 +375,17 @@ private fun EmptyState() {
 		),
 		elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None)
 	) {
-		Column(modifier = Modifier.padding(Spacing.M), verticalArrangement = Arrangement.spacedBy(Spacing.XS)) {
+		Column(
+			modifier = Modifier.padding(Spacing.M).fillMaxWidth(),
+			verticalArrangement = Arrangement.spacedBy(Spacing.S),
+			horizontalAlignment = Alignment.CenterHorizontally
+		) {
+			StickerDecoration(
+				drawableRes = R.drawable.kitty01,
+				size = 72.dp,
+				rotation = 0f,
+				alpha = 0.6f
+			)
 			Text(
 				text = "暂无数据",
 				style = MaterialTheme.typography.titleMedium,
@@ -389,6 +402,7 @@ private fun EmptyState() {
 
 @Composable
 private fun CompletionCard(window: InsightWindow) {
+	Box(modifier = Modifier.fillMaxWidth()) {
 	Card(
 		colors = CardDefaults.cardColors(
 			containerColor = MaterialTheme.colorScheme.surface
@@ -396,23 +410,33 @@ private fun CompletionCard(window: InsightWindow) {
 		elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
 		modifier = Modifier.fillMaxWidth()
 	) {
-		Row(
-			modifier = Modifier
-				.fillMaxWidth()
-				.padding(Spacing.M),
-			verticalAlignment = Alignment.CenterVertically,
-			horizontalArrangement = Arrangement.SpaceBetween
-		) {
-			Column(verticalArrangement = Arrangement.spacedBy(Spacing.XS), modifier = Modifier.weight(1f)) {
-				Text(text = "今日进度", style = MaterialTheme.typography.titleMedium)
-				Text(text = "${window.entryCount}/${window.days} 天已完成", color = MaterialTheme.colorScheme.onSurfaceVariant)
-				LinearProgressIndicator(
-					progress = { (window.entryCount.toFloat() / window.days.toFloat()).coerceIn(0f, 1f) },
-					modifier = Modifier.fillMaxWidth()
-				)
+			Row(
+				modifier = Modifier
+					.fillMaxWidth()
+					.padding(Spacing.M),
+				verticalAlignment = Alignment.CenterVertically,
+				horizontalArrangement = Arrangement.SpaceBetween
+			) {
+				Column(verticalArrangement = Arrangement.spacedBy(Spacing.XS), modifier = Modifier.weight(1f)) {
+					Text(text = "今日进度", style = MaterialTheme.typography.titleMedium)
+					Text(text = "${window.entryCount}/${window.days} 天已完成", color = MaterialTheme.colorScheme.onSurfaceVariant)
+					LinearProgressIndicator(
+						progress = { (window.entryCount.toFloat() / window.days.toFloat()).coerceIn(0f, 1f) },
+						modifier = Modifier.fillMaxWidth()
+					)
+				}
+				Icon(imageVector = Icons.Outlined.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
 			}
-			Icon(imageVector = Icons.Outlined.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-		}
+	}
+	StickerDecoration(
+		drawableRes = R.drawable.bow,
+		size = 44.dp,
+		rotation = 20f,
+		alpha = 0.5f,
+		modifier = Modifier
+			.align(Alignment.TopEnd)
+			.offset(x = 16.dp, y = (-16).dp)
+	)
 	}
 }
 
@@ -428,8 +452,9 @@ private fun InsightGrid(window: InsightWindow) {
 @Composable
 private fun SleepQualityCard(window: InsightWindow) {
 	val buckets = listOf(
-		SleepSegment(label = "≥8h", key = ">8", midpoint = 8.5f, color = MaterialTheme.colorScheme.success),
-		SleepSegment(label = "7-8h", key = "7-8", midpoint = 7.5f, color = MaterialTheme.colorScheme.primary),
+		SleepSegment(label = "≥9h", key = "9+", midpoint = 9.5f, color = MaterialTheme.colorScheme.primary),
+		SleepSegment(label = "8-9h", key = "8-9", midpoint = 8.5f, color = MaterialTheme.colorScheme.secondary),
+		SleepSegment(label = "7-8h", key = "7-8", midpoint = 7.5f, color = MaterialTheme.colorScheme.tertiary),
 		SleepSegment(label = "6-7h", key = "6-7", midpoint = 6.5f, color = MaterialTheme.colorScheme.warning),
 		SleepSegment(label = "<6h", key = "<6", midpoint = 5f, color = MaterialTheme.colorScheme.semanticError)
 	).map { segment -> segment.copy(value = window.sleepDistribution[segment.key] ?: 0) }
@@ -682,7 +707,12 @@ private fun WeeklyInsightCard(weekly: WeeklyInsightUi, onRetry: () -> Unit, onOp
 		) {
 			Column(verticalArrangement = Arrangement.spacedBy(Spacing.S), modifier = Modifier.fillMaxWidth()) {
 				Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.S)) {
-					Icon(imageVector = Icons.Outlined.Insights, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(32.dp))
+					StickerDecoration(
+						drawableRes = R.drawable.kitty02,
+						size = 52.dp,
+						rotation = 0f,
+						alpha = 1f
+					)
 					Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.XXS)) {
 						Text(text = "AI 洞察建议", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
 						Text(text = "每周会生成 AI 洞察建议，点击查看", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = if (hasPayload) 1f else 0.7f))
@@ -723,6 +753,7 @@ private fun DoctorReportCard(
 	var showDatePicker by remember { mutableStateOf(false) }
 	val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd") }
 	
+	Box(modifier = Modifier.fillMaxWidth()) {
 	Card(
 		shape = RoundedCornerShape(CornerRadius.Medium),
 		modifier = Modifier.fillMaxWidth(),
@@ -949,6 +980,16 @@ private fun DoctorReportCard(
 				modifier = Modifier.padding(top = Spacing.XXS)
 			)
 		}
+	}
+	StickerDecoration(
+		drawableRes = R.drawable.strawberry,
+		size = 48.dp,
+		rotation = -15f,
+		alpha = 0.5f,
+		modifier = Modifier
+			.align(Alignment.TopEnd)
+			.offset(x = 18.dp, y = (-18).dp)
+	)
 	}
 }
 

@@ -1,5 +1,6 @@
 package com.heldairy.core.data
 
+import com.heldairy.core.database.MedicationDao
 import com.heldairy.feature.medication.Med
 import com.heldairy.feature.medication.MedicationRepository
 import kotlinx.coroutines.CoroutineDispatcher
@@ -7,8 +8,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
@@ -18,6 +21,7 @@ import java.time.format.DateTimeFormatter
 class DoctorReportRepository(
     private val insightRepository: InsightRepository,
     private val medicationRepository: MedicationRepository,
+    private val medicationDao: MedicationDao,
     private val clock: Clock = Clock.systemDefaultZone(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
@@ -52,18 +56,50 @@ class DoctorReportRepository(
         // 获取活跃用药列表
         val activeMeds = medicationRepository.getActiveMeds().first()
         
+        // 获取时间范围内的用药事件
+        val medicationEvents = getMedicationEventsInRange(startDate, endDate)
+        
         val reportData = DoctorReportData(
             reportDate = endDate,
             timeWindow = timeWindow,
             patientInfo = buildPatientInfo(startDate, endDate),
             dataCompleteness = buildDataCompleteness(window),
-            medicationSummary = buildMedicationSummary(activeMeds, window),
+            medicationSummary = buildMedicationSummary(activeMeds, window, medicationEvents),
             symptomSummary = buildSymptomSummary(window),
             lifestyleSummary = buildLifestyleSummary(window),
             aiInsightsSummary = buildAiInsightsSummary()
         )
         
         reportData
+    }
+    
+    /**
+     * 获取指定日期范围内的用药事件
+     */
+    private suspend fun getMedicationEventsInRange(
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): List<MedicationEventForReport> {
+        val zone = ZoneId.systemDefault()
+        val startTime = startDate.atStartOfDay(zone).toInstant().toEpochMilli()
+        val endTime = endDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
+        
+        val events = medicationDao.getEventsInRange(startTime, endTime)
+        
+        val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+        val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+        
+        return events.map { event ->
+            val dateTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(event.createdAt),
+                zone
+            )
+            MedicationEventForReport(
+                date = dateTime.format(dateFormatter),
+                time = dateTime.format(timeFormatter),
+                description = event.rawText
+            )
+        }
     }
 
     private fun buildPatientInfo(startDate: LocalDate, endDate: LocalDate): PatientInfo {
@@ -95,7 +131,8 @@ class DoctorReportRepository(
 
     private fun buildMedicationSummary(
         activeMeds: List<Med>,
-        window: InsightWindow?
+        window: InsightWindow?,
+        medicationEvents: List<MedicationEventForReport>
     ): MedicationSummaryForReport {
         val activeMedications = activeMeds.mapNotNull { med ->
             val activeCourse = med.currentCourse
@@ -114,7 +151,8 @@ class DoctorReportRepository(
         
         return MedicationSummaryForReport(
             activeMedications = activeMedications,
-            adherence = adherence
+            adherence = adherence,
+            events = medicationEvents
         )
     }
 

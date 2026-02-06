@@ -9,15 +9,14 @@ import com.heldairy.core.data.DoctorReportData
 import com.heldairy.core.data.TrendFlag
 import java.io.File
 import java.io.FileOutputStream
-import java.time.format.DateTimeFormatter
-import kotlin.math.min
 
 /**
- * 改进的PDF医生报表生成器 v2.0
+ * 改进的PDF医生报表生成器 v3.0
  * - 使用StaticLayout改善中文排版
  * - 添加颜色编码和可视化
- * - 支持自动分页
+ * - 支持自动分页（修复分页后canvas引用问题）
  * - 生成到临时文件用于预览
+ * - 包含完整AI分析内容
  */
 class ImprovedDoctorReportPdfGenerator(
     private val context: Context,
@@ -31,21 +30,19 @@ class ImprovedDoctorReportPdfGenerator(
     private val marginHorizontal = 48f
     private val marginTop = 56f
     private val marginBottom = 56f
-    private val sectionSpacing = 32f
-    private val paragraphSpacing = 12f
+    private val sectionSpacing = 28f
     private val lineSpacing = 1.5f
     
     // 颜色定义
-    private val colorPrimary = Color.parseColor("#1976D2") // 蓝色
-    private val colorSuccess = Color.parseColor("#4CAF50") // 绿色
-    private val colorWarning = Color.parseColor("#FF9800") // 橙色
-    private val colorError = Color.parseColor("#F44336")   // 红色
+    private val colorPrimary = Color.parseColor("#1976D2")
+    private val colorSuccess = Color.parseColor("#4CAF50")
+    private val colorWarning = Color.parseColor("#FF9800")
+    private val colorError = Color.parseColor("#F44336")
     private val colorGray900 = Color.parseColor("#212121")
     private val colorGray700 = Color.parseColor("#616161")
-    private val colorGray500 = Color.parseColor("#9E9E9E")
     private val colorGray300 = Color.parseColor("#E0E0E0")
     
-    // TextPaint对象（使用真实字体）
+    // TextPaint对象
     private val titlePaint = TextPaint().apply {
         color = colorPrimary
         textSize = 28f
@@ -55,14 +52,14 @@ class ImprovedDoctorReportPdfGenerator(
     
     private val sectionHeaderPaint = TextPaint().apply {
         color = colorGray900
-        textSize = 18f
+        textSize = 16f
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         isAntiAlias = true
     }
     
     private val bodyPaint = TextPaint().apply {
         color = colorGray900
-        textSize = 12f
+        textSize = 11f
         typeface = Typeface.DEFAULT
         isAntiAlias = true
     }
@@ -76,12 +73,11 @@ class ImprovedDoctorReportPdfGenerator(
     
     private val boldBodyPaint = TextPaint().apply {
         color = colorGray900
-        textSize = 12f
+        textSize = 11f
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         isAntiAlias = true
     }
     
-    // 绘制用Paint
     private val linePaint = Paint().apply {
         color = colorGray300
         strokeWidth = 1f
@@ -99,503 +95,462 @@ class ImprovedDoctorReportPdfGenerator(
     private var currentPage: PdfDocument.Page? = null
     private var currentCanvas: Canvas? = null
     private var pageNumber = 1
-    private val pages = mutableListOf<PdfDocument.Page>()
+    private lateinit var pdfDoc: PdfDocument
+    
+    /**
+     * 获取当前可用的Canvas，如果不可用则抛出异常
+     */
+    private fun canvas(): Canvas = currentCanvas 
+        ?: throw IllegalStateException("Canvas not available")
     
     /**
      * 生成PDF到临时文件
      */
     fun generateToTempFile(): File {
         val tempFile = File(context.cacheDir, "temp_doctor_report_${System.currentTimeMillis()}.pdf")
-        val pdfDocument = PdfDocument()
+        pdfDoc = PdfDocument()
         
         try {
-            // 创建第一页
-            startNewPage(pdfDocument)
-            
-            // 绘制报表内容
+            pageNumber = 1
+            startNewPage()
             drawReport()
+            finishCurrentPage()
             
-            // 完成当前页
-            finishCurrentPage(pdfDocument)
-            
-            // 写入文件
             FileOutputStream(tempFile).use { outputStream ->
-                pdfDocument.writeTo(outputStream)
+                pdfDoc.writeTo(outputStream)
             }
             
             return tempFile
         } finally {
-            pdfDocument.close()
+            pdfDoc.close()
         }
     }
     
-    private fun startNewPage(pdfDocument: PdfDocument) {
-        // 完成上一页
+    private fun startNewPage() {
         if (currentPage != null) {
-            finishCurrentPage(pdfDocument)
+            finishCurrentPage()
         }
         
-        // 创建新页
         val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
-        currentPage = pdfDocument.startPage(pageInfo)
+        currentPage = pdfDoc.startPage(pageInfo)
         currentCanvas = currentPage?.canvas
         currentY = marginTop
-        pages.add(currentPage!!)
         pageNumber++
     }
     
-    private fun finishCurrentPage(pdfDocument: PdfDocument) {
+    private fun finishCurrentPage() {
         currentPage?.let { page ->
-            // 绘制页脚
-            drawPageFooter(page.canvas, pageNumber - 1, pages.size)
-            pdfDocument.finishPage(page)
+            drawPageFooter(page.canvas, pageNumber - 1)
+            pdfDoc.finishPage(page)
         }
         currentPage = null
         currentCanvas = null
     }
     
-    private fun checkPageSpace(requiredHeight: Float, pdfDocument: PdfDocument) {
+    /**
+     * 确保有足够空间，否则分页
+     */
+    private fun ensureSpace(requiredHeight: Float) {
         if (currentY + requiredHeight > pageHeight - marginBottom) {
-            startNewPage(pdfDocument)
+            startNewPage()
         }
     }
+    
+    private fun getContentWidth(): Float = pageWidth - 2 * marginHorizontal
     
     private fun drawReport() {
-        val canvas = currentCanvas ?: return
-        
-        // 1. 报表信息（包含标题和免责声明）
-        drawReportInfo(canvas)
+        // 1. 报表标题和信息
+        drawReportInfo()
         currentY += sectionSpacing
         
-        // 2. 数据完整度（带进度条）
-        drawDataCompleteness(canvas)
+        // 2. 数据完整度
+        drawDataCompleteness()
         currentY += sectionSpacing
         
-        // 4. 用药情况（带环形图）
-        drawMedicationSummary(canvas)
+        // 3. 用药情况
+        drawMedicationSummary()
         currentY += sectionSpacing
         
-        // 5. 症状趋势（带迷你折线图和颜色编码）
-        drawSymptomTrends(canvas)
+        // 4. 症状趋势
+        drawSymptomTrends()
         currentY += sectionSpacing
         
-        // 6. 生活方式
-        drawLifestyleSummary(canvas)
+        // 5. 生活方式
+        drawLifestyleSummary()
         currentY += sectionSpacing
         
-        // 7. AI洞察（如果有）
-        if (reportData.aiInsightsSummary != null) {
-            drawAiInsights(canvas)
-            currentY += sectionSpacing
-        }
+        // 6. AI健康洞察（完整内容）
+        drawAiInsights()
+        currentY += sectionSpacing
         
-        // 8. 免责声明
-        drawDisclaimer(canvas)
+        // 7. 免责声明
+        drawDisclaimer()
     }
     
-    private fun drawReportInfo(canvas: Canvas) {
-        // 标题：健康数据报告
-        val title = "健康数据报告"
-        canvas.drawText(title, marginHorizontal, currentY, titlePaint)
+    private fun drawReportInfo() {
+        val c = canvas()
+        
+        // 标题
+        c.drawText("健康数据报告", marginHorizontal, currentY, titlePaint)
         currentY += titlePaint.textSize + 8f
         
-        // 免责声明小字
-        val disclaimer = "本报告仅供医生参考，不构成医疗诊断依据"
+        // 副标题
         captionPaint.color = colorGray700
-        canvas.drawText(disclaimer, marginHorizontal, currentY, captionPaint)
+        c.drawText("本报告仅供医生参考，不构成医疗诊断依据", marginHorizontal, currentY, captionPaint)
         currentY += captionPaint.textSize + 16f
         
-        // 绘制装饰线
-        canvas.drawLine(
-            marginHorizontal,
-            currentY,
-            pageWidth - marginHorizontal,
-            currentY,
-            linePaint.apply { strokeWidth = 2f; color = colorPrimary }
-        )
+        // 装饰线
+        linePaint.strokeWidth = 2f
+        linePaint.color = colorPrimary
+        c.drawLine(marginHorizontal, currentY, pageWidth - marginHorizontal, currentY, linePaint)
         currentY += 16f
         
-        drawSectionHeader(canvas, "报表信息")
+        // 报表信息
+        drawSectionHeader("报表信息")
         
         val info = reportData.patientInfo
-        val infoLines = listOf(
-            "生成时间: ${info.reportGeneratedAt}",
-            "数据范围: ${info.dataRangeStart} 至 ${info.dataRangeEnd} (${reportData.timeWindow}天)"
-        )
-        
-        infoLines.forEach { text ->
-            drawBodyText(canvas, text, marginHorizontal + 16f)
-            currentY += bodyPaint.textSize * lineSpacing
-        }
+        drawText("生成时间: ${info.reportGeneratedAt}", marginHorizontal + 16f)
+        currentY += bodyPaint.textSize * lineSpacing
+        drawText("数据范围: ${info.dataRangeStart} 至 ${info.dataRangeEnd} (${reportData.timeWindow}天)", marginHorizontal + 16f)
+        currentY += bodyPaint.textSize * lineSpacing
     }
     
-    private fun drawDataCompleteness(canvas: Canvas) {
-        drawSectionHeader(canvas, "数据完整度")
+    private fun drawDataCompleteness() {
+        ensureSpace(60f)
+        drawSectionHeader("数据完整度")
         
         val completeness = reportData.dataCompleteness
         val percentage = (completeness.completionRate * 100).toInt()
         
-        // 文本说明
-        val text = "已填写 ${completeness.filledDays} / ${completeness.totalDays} 天 ($percentage%)"
-        drawBodyText(canvas, text, marginHorizontal + 16f, currentY)
+        drawText("已填写 ${completeness.filledDays} / ${completeness.totalDays} 天 ($percentage%)", marginHorizontal + 16f)
         currentY += bodyPaint.textSize * lineSpacing + 8f
         
         // 进度条
-        drawProgressBar(canvas, completeness.completionRate.toFloat(), marginHorizontal + 16f, currentY)
+        val c = canvas()
+        val barWidth = getContentWidth() - 32f
+        val barHeight = 12f
+        val cornerRadius = 6f
+        val x = marginHorizontal + 16f
+        
+        fillPaint.color = colorGray300
+        c.drawRoundRect(RectF(x, currentY, x + barWidth, currentY + barHeight), cornerRadius, cornerRadius, fillPaint)
+        
+        val progressWidth = barWidth * completeness.completionRate.toFloat()
+        fillPaint.color = when {
+            completeness.completionRate >= 0.7 -> colorSuccess
+            completeness.completionRate >= 0.5 -> colorWarning
+            else -> colorError
+        }
+        c.drawRoundRect(RectF(x, currentY, x + progressWidth, currentY + barHeight), cornerRadius, cornerRadius, fillPaint)
         currentY += 20f
     }
     
-    private fun drawProgressBar(canvas: Canvas, progress: Float, x: Float, y: Float) {
-        val barWidth = pageWidth - 2 * marginHorizontal - 32f
-        val barHeight = 12f
-        val cornerRadius = 6f
-        
-        // 背景
-        val bgRect = RectF(x, y, x + barWidth, y + barHeight)
-        fillPaint.color = colorGray300
-        canvas.drawRoundRect(bgRect, cornerRadius, cornerRadius, fillPaint)
-        
-        // 进度
-        val progressWidth = barWidth * progress
-        val progressRect = RectF(x, y, x + progressWidth, y + barHeight)
-        fillPaint.color = when {
-            progress >= 0.7f -> colorSuccess
-            progress >= 0.5f -> colorWarning
-            else -> colorError
-        }
-        canvas.drawRoundRect(progressRect, cornerRadius, cornerRadius, fillPaint)
-    }
-    
-    private fun drawMedicationSummary(canvas: Canvas) {
-        drawSectionHeader(canvas, "用药情况")
+    private fun drawMedicationSummary() {
+        ensureSpace(60f)
+        drawSectionHeader("用药情况")
         
         val summary = reportData.medicationSummary
         
-        if (summary.activeMedications.isEmpty()) {
-            drawBodyText(canvas, "当前无活跃用药", marginHorizontal + 16f)
+        if (summary.activeMedications.isEmpty() && summary.events.isEmpty()) {
+            drawText("当前无活跃用药记录", marginHorizontal + 16f)
             currentY += bodyPaint.textSize * lineSpacing
             return
         }
         
-        // 活跃药物列表
-        drawBodyText(canvas, "用药从医:", marginHorizontal + 16f, paint = boldBodyPaint)
-        currentY += bodyPaint.textSize * lineSpacing
-        
-        summary.activeMedications.forEach { med ->
-            val medText = "• ${med.name}: ${med.dosage}, ${med.frequency}${med.timeHints?.let { ", $it" } ?: ""}"
-            drawBodyText(canvas, medText, marginHorizontal + 32f)
+        // 当前用药
+        if (summary.activeMedications.isNotEmpty()) {
+            drawText("当前用药:", marginHorizontal + 16f, boldBodyPaint)
             currentY += bodyPaint.textSize * lineSpacing
+            
+            summary.activeMedications.forEach { med ->
+                ensureSpace(20f)
+                val dosageInfo = med.dosage?.let { " $it" } ?: ""
+                val timeInfo = med.timeHints?.let { " ($it)" } ?: ""
+                drawText("• ${med.name}$dosageInfo, ${med.frequency}$timeInfo", marginHorizontal + 32f)
+                currentY += bodyPaint.textSize * lineSpacing
+            }
+            currentY += 8f
         }
         
-        currentY += 8f
-        
         // 依从性统计
-        drawBodyText(canvas, "用药依从性:", marginHorizontal + 16f, currentY, boldBodyPaint)
+        ensureSpace(40f)
+        drawText("用药依从性:", marginHorizontal + 16f, boldBodyPaint)
         currentY += bodyPaint.textSize * lineSpacing
         
         val adherence = summary.adherence
-        val adherenceText = "按时服用: ${adherence.onTime}天, 有遗漏: ${adherence.missed}天, 无需用药: ${adherence.na}天"
-        drawBodyText(canvas, adherenceText, marginHorizontal + 32f)
+        drawText("按时服用: ${adherence.onTime}天, 有遗漏: ${adherence.missed}天, 无需用药: ${adherence.na}天", marginHorizontal + 32f)
         currentY += bodyPaint.textSize * lineSpacing
+        
+        // 用药事件记录
+        if (summary.events.isNotEmpty()) {
+            currentY += 8f
+            ensureSpace(40f)
+            drawText("用药变更记录:", marginHorizontal + 16f, boldBodyPaint)
+            currentY += bodyPaint.textSize * lineSpacing + 4f
+            
+            val eventsByDate = summary.events.groupBy { it.date }
+            eventsByDate.forEach { (date, events) ->
+                ensureSpace(24f)
+                drawText("[$date]", marginHorizontal + 24f, captionPaint)
+                currentY += captionPaint.textSize * 1.3f
+                
+                events.forEach { event ->
+                    ensureSpace(24f)
+                    drawMultilineText("${event.time} - ${event.description}", marginHorizontal + 40f, (getContentWidth() - 56f).toInt())
+                }
+            }
+        }
     }
     
-    private fun drawSymptomTrends(canvas: Canvas) {
-        drawSectionHeader(canvas, "症状趋势")
+    private fun drawSymptomTrends() {
+        ensureSpace(60f)
+        drawSectionHeader("症状趋势")
         
-        // 表格表头（移除趋势图列）
+        if (reportData.symptomSummary.metrics.isEmpty()) {
+            drawText("暂无症状数据", marginHorizontal + 16f)
+            currentY += bodyPaint.textSize * lineSpacing
+            return
+        }
+        
         val startX = marginHorizontal + 16f
-        val colWidths = floatArrayOf(120f, 100f, 100f, 190f)
-        val headers = listOf("症状名称", "平均值", "最近值", "趋势")
+        val colWidths = floatArrayOf(100f, 70f, 70f, 160f)
         
-        drawTableRow(canvas, headers, colWidths, startX, currentY, true)
+        // 表头
+        ensureSpace(30f)
+        var x = startX
+        listOf("症状", "平均值", "最近值", "趋势").forEachIndexed { i, header ->
+            canvas().drawText(header, x + 4f, currentY, boldBodyPaint)
+            x += colWidths[i]
+        }
         currentY += bodyPaint.textSize * lineSpacing + 4f
         
         // 分隔线
-        canvas.drawLine(startX, currentY, startX + colWidths.sum(), currentY, linePaint)
+        linePaint.color = colorGray300
+        linePaint.strokeWidth = 1f
+        canvas().drawLine(startX, currentY, startX + colWidths.sum(), currentY, linePaint)
         currentY += 4f
         
-        // 症状数据行
+        // 数据行
         reportData.symptomSummary.metrics.forEachIndexed { index, metric ->
-            val rowStartY = currentY
+            ensureSpace(24f)
+            val c = canvas()
             
-            // 斑马纹背景
+            // 斑马纹
             if (index % 2 == 1) {
                 fillPaint.color = Color.parseColor("#F5F5F5")
-                canvas.drawRect(
-                    startX,
-                    rowStartY - 2f,
-                    startX + colWidths.sum(),
-                    rowStartY + bodyPaint.textSize * lineSpacing + 2f,
-                    fillPaint
-                )
+                c.drawRect(startX, currentY - 2f, startX + colWidths.sum(), currentY + bodyPaint.textSize * lineSpacing + 2f, fillPaint)
             }
             
             // 症状名称
-            drawBodyText(canvas, metric.symptomName, startX + 4f, currentY)
+            c.drawText(metric.symptomName, startX + 4f, currentY, bodyPaint)
             
-            // 平均值（颜色编码）
-            val avgColor = getSeverityColor(metric.average.toFloat())
-            drawBodyText(
-                canvas,
-                String.format("%.1f", metric.average),
-                startX + colWidths[0] + 4f,
-                currentY,
-                bodyPaint.apply { color = avgColor }
-            )
-            bodyPaint.color = colorGray900 // 重置颜色
+            // 平均值
+            bodyPaint.color = getSeverityColor(metric.average.toFloat())
+            c.drawText(String.format("%.1f", metric.average), startX + colWidths[0] + 4f, currentY, bodyPaint)
+            bodyPaint.color = colorGray900
             
-            // 最近值（颜色编码）
+            // 最近值
             val latestValue = metric.latestValue ?: metric.average
-            val latestColor = getSeverityColor(latestValue.toFloat())
-            drawBodyText(
-                canvas,
-                String.format("%.1f", latestValue),
-                startX + colWidths[0] + colWidths[1] + 4f,
-                currentY,
-                bodyPaint.apply { color = latestColor }
-            )
+            bodyPaint.color = getSeverityColor(latestValue.toFloat())
+            c.drawText(String.format("%.1f", latestValue), startX + colWidths[0] + colWidths[1] + 4f, currentY, bodyPaint)
             bodyPaint.color = colorGray900
             
             // 趋势
-            val trendSymbol = when (metric.trend) {
-                TrendFlag.rising -> "↑ ${metric.trendDescription}"
-                TrendFlag.falling -> "↓ ${metric.trendDescription}"
-                TrendFlag.stable -> "→ ${metric.trendDescription}"
+            val (trendSymbol, trendColor) = when (metric.trend) {
+                TrendFlag.rising -> "↑ ${metric.trendDescription}" to colorError
+                TrendFlag.falling -> "↓ ${metric.trendDescription}" to colorSuccess
+                TrendFlag.stable -> "→ ${metric.trendDescription}" to colorGray700
             }
-            val trendColor = when (metric.trend) {
-                TrendFlag.rising -> colorError
-                TrendFlag.falling -> colorSuccess
-                TrendFlag.stable -> colorGray700
-            }
-            drawBodyText(
-                canvas,
-                trendSymbol,
-                startX + colWidths[0] + colWidths[1] + colWidths[2] + 4f,
-                currentY,
-                bodyPaint.apply { color = trendColor }
-            )
+            bodyPaint.color = trendColor
+            c.drawText(trendSymbol, startX + colWidths[0] + colWidths[1] + colWidths[2] + 4f, currentY, bodyPaint)
             bodyPaint.color = colorGray900
             
             currentY += bodyPaint.textSize * lineSpacing + 4f
         }
     }
     
-    private fun drawSparkline(
-        canvas: Canvas,
-        data: List<Float>,
-        x: Float,
-        y: Float,
-        width: Float,
-        height: Float
-    ) {
-        if (data.size < 2) return
-        
-        val minVal = 0f
-        val maxVal = 10f
-        val path = Path()
-        
-        data.forEachIndexed { index, value ->
-            val xPos = x + (index.toFloat() / (data.size - 1)) * width
-            val yPos = y + height - ((value - minVal) / (maxVal - minVal)) * height
-            
-            if (index == 0) {
-                path.moveTo(xPos, yPos)
-            } else {
-                path.lineTo(xPos, yPos)
-            }
-        }
-        
-        val sparklinePaint = Paint().apply {
-            color = colorPrimary
-            strokeWidth = 1.5f
-            style = Paint.Style.STROKE
-            isAntiAlias = true
-        }
-        
-        canvas.drawPath(path, sparklinePaint)
-    }
-    
-    private fun drawLifestyleSummary(canvas: Canvas) {
-        drawSectionHeader(canvas, "生活方式")
+    private fun drawLifestyleSummary() {
+        ensureSpace(60f)
+        drawSectionHeader("生活方式")
         
         val lifestyle = reportData.lifestyleSummary
         
-        // 睡眠时长
         if (lifestyle.sleepSummary.isNotBlank()) {
-            drawBodyText(canvas, "睡眠时长:", marginHorizontal + 16f, currentY, boldBodyPaint)
+            ensureSpace(36f)
+            drawText("睡眠时长:", marginHorizontal + 16f, boldBodyPaint)
             currentY += bodyPaint.textSize * lineSpacing
-            drawBodyText(canvas, lifestyle.sleepSummary, marginHorizontal + 32f)
-            currentY += bodyPaint.textSize * lineSpacing + 8f
+            drawText(lifestyle.sleepSummary, marginHorizontal + 32f)
+            currentY += bodyPaint.textSize * lineSpacing + 6f
         }
         
-        // 午睡情况
         if (lifestyle.napSummary.isNotBlank()) {
-            drawBodyText(canvas, "午睡情况:", marginHorizontal + 16f, currentY, boldBodyPaint)
+            ensureSpace(36f)
+            drawText("午睡情况:", marginHorizontal + 16f, boldBodyPaint)
             currentY += bodyPaint.textSize * lineSpacing
-            drawBodyText(canvas, lifestyle.napSummary, marginHorizontal + 32f)
-            currentY += bodyPaint.textSize * lineSpacing + 8f
+            drawText(lifestyle.napSummary, marginHorizontal + 32f)
+            currentY += bodyPaint.textSize * lineSpacing + 6f
         }
         
-        // 运动步数
         if (lifestyle.stepsSummary.isNotBlank()) {
-            drawBodyText(canvas, "运动步数:", marginHorizontal + 16f, currentY, boldBodyPaint)
+            ensureSpace(36f)
+            drawText("运动步数:", marginHorizontal + 16f, boldBodyPaint)
             currentY += bodyPaint.textSize * lineSpacing
-            drawBodyText(canvas, lifestyle.stepsSummary, marginHorizontal + 32f)
-            currentY += bodyPaint.textSize * lineSpacing + 8f
+            drawText(lifestyle.stepsSummary, marginHorizontal + 32f)
+            currentY += bodyPaint.textSize * lineSpacing + 6f
         }
         
-        // 其他信息
         if (lifestyle.chillExposureDays > 0) {
-            drawBodyText(canvas, "受凉天数: ${lifestyle.chillExposureDays}天", marginHorizontal + 16f)
+            ensureSpace(20f)
+            drawText("受凉天数: ${lifestyle.chillExposureDays}天", marginHorizontal + 16f)
             currentY += bodyPaint.textSize * lineSpacing
         }
         
         if (!lifestyle.menstrualSummary.isNullOrBlank()) {
-            drawBodyText(canvas, "经期状态: ${lifestyle.menstrualSummary}", marginHorizontal + 16f)
+            ensureSpace(20f)
+            drawText("经期状态: ${lifestyle.menstrualSummary}", marginHorizontal + 16f)
             currentY += bodyPaint.textSize * lineSpacing
         }
     }
     
-    private fun drawAiInsights(canvas: Canvas) {
-        drawSectionHeader(canvas, "AI健康洞察")
+    private fun drawAiInsights() {
+        ensureSpace(80f)
+        drawSectionHeader("AI健康洞察")
         
-        val ai = reportData.aiInsightsSummary ?: return
+        val ai = reportData.aiInsightsSummary
         
-        // 构建详细分析（目标300字以上）
-        val detailedAnalysis = buildDetailedAiAnalysis(ai.weeklyInsights)
-        
-        // 使用StaticLayout绘制长文本
-        val textWidth = (pageWidth - 2 * marginHorizontal - 48f).toInt()
-        val layout = StaticLayout.Builder.obtain(
-            detailedAnalysis,
-            0,
-            detailedAnalysis.length,
-            bodyPaint,
-            textWidth
-        ).build()
-        
-        canvas.save()
-        canvas.translate(marginHorizontal + 16f, currentY)
-        layout.draw(canvas)
-        canvas.restore()
-        
-        currentY += layout.height + 12f
-        
-        if (ai.topSuggestions.isNotEmpty()) {
-            drawBodyText(canvas, "建议关注:", marginHorizontal + 16f, currentY, boldBodyPaint)
+        if (ai == null) {
+            drawText("暂无AI分析（请确保已配置API密钥并生成周度洞察）", marginHorizontal + 16f)
             currentY += bodyPaint.textSize * lineSpacing
+            return
+        }
+        
+        // 完整显示周度洞察内容
+        if (ai.weeklyInsights.isNotEmpty()) {
+            drawText("健康趋势分析:", marginHorizontal + 16f, boldBodyPaint)
+            currentY += bodyPaint.textSize * lineSpacing + 4f
             
-            ai.topSuggestions.take(3).forEach { suggestion ->
-                drawBodyText(canvas, "• $suggestion", marginHorizontal + 32f)
-                currentY += bodyPaint.textSize * lineSpacing
+            ai.weeklyInsights.forEach { insight ->
+                ensureSpace(40f)
+                drawMultilineText("• $insight", marginHorizontal + 24f, (getContentWidth() - 40f).toInt())
+                currentY += 4f
+            }
+            currentY += 8f
+        }
+        
+        // 建议关注
+        if (ai.topSuggestions.isNotEmpty()) {
+            ensureSpace(40f)
+            drawText("重点建议:", marginHorizontal + 16f, boldBodyPaint)
+            currentY += bodyPaint.textSize * lineSpacing + 4f
+            
+            ai.topSuggestions.forEach { suggestion ->
+                ensureSpace(40f)
+                drawMultilineText("• $suggestion", marginHorizontal + 24f, (getContentWidth() - 40f).toInt())
+                currentY += 4f
             }
         }
+        
+        // 补充分析上下文
+        currentY += 8f
+        ensureSpace(60f)
+        val contextAnalysis = buildContextAnalysis()
+        drawMultilineText(contextAnalysis, marginHorizontal + 16f, (getContentWidth() - 32f).toInt())
     }
     
-    private fun buildDetailedAiAnalysis(insights: List<String>): String {
-        val mainInsight = insights.firstOrNull() ?: "本周健康状况总体稳定。"
+    /**
+     * 构建上下文分析，结合长期趋势
+     */
+    private fun buildContextAnalysis(): String {
+        val sb = StringBuilder()
+        sb.append("【综合分析】")
         
-        // 如果已经足够长，直接返回
-        if (mainInsight.length >= 200) {
-            return mainInsight
+        // 基于症状趋势
+        val risingSymptoms = reportData.symptomSummary.metrics.filter { it.trend == TrendFlag.rising }
+        val fallingSymptoms = reportData.symptomSummary.metrics.filter { it.trend == TrendFlag.falling }
+        val highSeverity = reportData.symptomSummary.metrics.filter { it.average > 6.0 }
+        
+        if (highSeverity.isNotEmpty()) {
+            sb.append("本周期内${highSeverity.joinToString("、") { it.symptomName }}症状较为严重（平均值>6），建议重点关注并与医生沟通。")
         }
         
-        // 否则组合多个洞察
-        val combined = insights.take(3).joinToString(" ")
-        
-        // 添加数据上下文
-        val contextPrefix = "根据本报告周期内的健康数据分析，"
-        val contextSuffix = when {
-            reportData.symptomSummary.metrics.any { it.average > 7.0 } -> 
-                " 建议重点关注高严重度症状，及时就医咨询专业意见。同时请注意保持良好作息，避免过度疲劳，并按时记录症状变化。"
-            reportData.medicationSummary.adherence.missed > reportData.medicationSummary.adherence.onTime ->
-                " 请注意改善用药依从性，按时服药对病情控制至关重要。建议设置服药提醒，并与医生沟通任何用药困难。"
-            reportData.dataCompleteness.completionRate < 0.5 ->
-                " 建议提高数据记录完整度，以便获得更准确的健康趋势分析。定期记录有助于及时发现健康问题。"
-            else ->
-                " 请继续保持良好的健康管理习惯，定期记录和观察身体变化。如有任何不适，请及时就医。"
+        if (risingSymptoms.isNotEmpty()) {
+            sb.append("${risingSymptoms.joinToString("、") { it.symptomName }}呈上升趋势，需要注意观察。")
         }
         
-        return contextPrefix + combined + contextSuffix
+        if (fallingSymptoms.isNotEmpty()) {
+            sb.append("${fallingSymptoms.joinToString("、") { it.symptomName }}有所改善，可继续保持当前调理方式。")
+        }
+        
+        // 基于用药依从性
+        val adherence = reportData.medicationSummary.adherence
+        if (adherence.missed > adherence.onTime && adherence.onTime + adherence.missed > 0) {
+            sb.append("用药依从性有待改善，建议设置提醒确保按时服药。")
+        }
+        
+        // 基于数据完整度
+        if (reportData.dataCompleteness.completionRate < 0.5) {
+            sb.append("数据记录完整度较低(${(reportData.dataCompleteness.completionRate * 100).toInt()}%)，建议坚持每日记录以获得更准确的健康趋势分析。")
+        }
+        
+        if (sb.toString() == "【综合分析】") {
+            sb.append("本周期健康状况总体稳定，请继续保持良好的生活习惯和健康记录。")
+        }
+        
+        return sb.toString()
     }
     
-    private fun drawDisclaimer(canvas: Canvas) {
+    private fun drawDisclaimer() {
+        ensureSpace(50f)
+        val c = canvas()
+        
+        linePaint.strokeWidth = 0.5f
+        linePaint.color = colorGray300
+        c.drawLine(marginHorizontal, currentY, pageWidth - marginHorizontal, currentY, linePaint)
+        currentY += 12f
+        
         val disclaimer = "⚠️ 本报告由健康日记APP生成，仅供医生参考，不构成医疗诊断依据。请以医生的专业判断为准。"
+        drawMultilineText(disclaimer, marginHorizontal, getContentWidth().toInt(), captionPaint)
+    }
+    
+    private fun drawPageFooter(canvas: Canvas, pageNum: Int) {
+        val footerY = pageHeight - marginBottom / 2
+        val footerText = "第 $pageNum 页"
+        val textWidth = captionPaint.measureText(footerText)
+        canvas.drawText(footerText, pageWidth / 2f - textWidth / 2f, footerY, captionPaint)
+    }
+    
+    private fun drawSectionHeader(text: String) {
+        canvas().drawText(text, marginHorizontal, currentY, sectionHeaderPaint)
+        currentY += sectionHeaderPaint.textSize + 10f
+    }
+    
+    private fun drawText(text: String, x: Float, paint: TextPaint = bodyPaint) {
+        canvas().drawText(text, x, currentY, paint)
+    }
+    
+    /**
+     * 绘制多行文本，支持自动换行和分页
+     */
+    private fun drawMultilineText(text: String, x: Float, maxWidth: Int, paint: TextPaint = bodyPaint) {
+        val layout = StaticLayout.Builder.obtain(text, 0, text.length, paint, maxWidth).build()
         
-        // 分隔线
-        canvas.drawLine(
-            marginHorizontal,
-            currentY,
-            pageWidth - marginHorizontal,
-            currentY,
-            linePaint.apply { strokeWidth = 0.5f }
-        )
-        currentY += 16f
+        // 检查是否需要分页
+        if (currentY + layout.height > pageHeight - marginBottom) {
+            startNewPage()
+        }
         
-        // 使用StaticLayout绘制多行文本
-        val textWidth = (pageWidth - 2 * marginHorizontal).toInt()
-        val layout = StaticLayout.Builder.obtain(
-            disclaimer,
-            0,
-            disclaimer.length,
-            captionPaint,
-            textWidth
-        ).build()
-        
-        canvas.save()
-        canvas.translate(marginHorizontal, currentY)
-        layout.draw(canvas)
-        canvas.restore()
+        val c = canvas()
+        c.save()
+        c.translate(x, currentY)
+        layout.draw(c)
+        c.restore()
         
         currentY += layout.height
     }
     
-    private fun drawPageFooter(canvas: Canvas, pageNum: Int, totalPages: Int) {
-        val footerY = pageHeight - marginBottom / 2
-        val footerText = "第 $pageNum 页 / 共 $totalPages 页"
-        val textWidth = captionPaint.measureText(footerText)
-        val centerX = pageWidth / 2f - textWidth / 2f
-        
-        canvas.drawText(footerText, centerX, footerY, captionPaint)
-    }
-    
-    private fun drawSectionHeader(canvas: Canvas, text: String) {
-        canvas.drawText(text, marginHorizontal, currentY, sectionHeaderPaint)
-        currentY += sectionHeaderPaint.textSize + 12f
-    }
-    
-    private fun drawBodyText(
-        canvas: Canvas,
-        text: String,
-        x: Float,
-        y: Float = currentY,
-        paint: TextPaint = bodyPaint
-    ) {
-        canvas.drawText(text, x, y, paint)
-    }
-    
-    private fun drawTableRow(
-        canvas: Canvas,
-        cells: List<String>,
-        colWidths: FloatArray,
-        startX: Float,
-        y: Float,
-        isHeader: Boolean
-    ) {
-        val paint = if (isHeader) boldBodyPaint else bodyPaint
-        var x = startX
-        
-        cells.forEachIndexed { index, cell ->
-            canvas.drawText(cell, x + 4f, y, paint)
-            x += colWidths[index]
-        }
-    }
-    
-    private fun getSeverityColor(value: Float): Int {
-        return when {
-            value < 3f -> colorSuccess
-            value < 7f -> colorWarning
-            else -> colorError
-        }
+    private fun getSeverityColor(value: Float): Int = when {
+        value < 3f -> colorSuccess
+        value < 7f -> colorWarning
+        else -> colorError
     }
 }

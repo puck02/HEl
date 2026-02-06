@@ -128,6 +128,7 @@ class AppContainerImpl(context: Context) : AppContainer {
 
     override val doctorReportRepository: DoctorReportRepository = DoctorReportRepository(
         insightRepository = insightRepository,
-        medicationRepository = medicationRepository
+        medicationRepository = medicationRepository,
+        medicationDao = database.medicationDao()
     )
 }

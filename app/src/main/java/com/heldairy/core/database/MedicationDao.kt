@@ -74,6 +74,9 @@ interface MedicationDao {
     @Query("SELECT * FROM med_event WHERE id = :eventId")
     suspend fun getEventById(eventId: Long): MedEventEntity?
     
+    @Query("SELECT * FROM med_event WHERE createdAt >= :startTime AND createdAt <= :endTime ORDER BY createdAt ASC")
+    suspend fun getEventsInRange(startTime: Long, endTime: Long): List<MedEventEntity>
+    
     // Reminder operations
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReminder(reminder: MedicationReminderEntity): Long
