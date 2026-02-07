@@ -1,6 +1,8 @@
 package com.heldairy.core.data
 
+import com.heldairy.core.database.DailyReportDao
 import com.heldairy.core.database.MedicationDao
+import com.heldairy.core.database.entity.DailyEntryWithResponses
 import com.heldairy.feature.medication.Med
 import com.heldairy.feature.medication.MedicationRepository
 import kotlinx.coroutines.CoroutineDispatcher
@@ -15,13 +17,14 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
- * 医生报表数据汇总Repository
- * 负责收集和组织生成PDF报表所需的所有数据
+ * 医生报表数据汇总Repository v4.0
+ * 负责收集和组织生成专业PDF健康洞察报告所需的所有数据
  */
 class DoctorReportRepository(
     private val insightRepository: InsightRepository,
     private val medicationRepository: MedicationRepository,
     private val medicationDao: MedicationDao,
+    private val dailyReportDao: DailyReportDao,
     private val clock: Clock = Clock.systemDefaultZone(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
@@ -51,13 +54,28 @@ class DoctorReportRepository(
         val timeWindow = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate).toInt() + 1
         
         val summary = insightRepository.buildLocalSummary(endDate)
-        val window = if (timeWindow == 7) summary.window7 else summary.window30
+        val window = if (timeWindow <= 7) summary.window7 else summary.window30
         
         // 获取活跃用药列表
         val activeMeds = medicationRepository.getActiveMeds().first()
         
         // 获取时间范围内的用药事件
         val medicationEvents = getMedicationEventsInRange(startDate, endDate)
+        
+        // 获取原始日报条目（用于增强分析、饼图、随访统计等）
+        val rawEntries = try {
+            dailyReportDao.observeEntriesInRange(
+                startDate.toString(), endDate.toString()
+            ).first()
+        } catch (_: Exception) { emptyList() }
+        
+        // 增强分析（趋势、异常、改善/关注模式、环比变化）
+        val enhanced = if (rawEntries.size >= 3) {
+            EnhancedAnalyzer.buildEnhancedWeeklySummary(rawEntries, endDate)
+        } else null
+        
+        // 心情 & 能量均值
+        val (moodAvg, energyAvg) = extractMoodAndEnergy(window)
         
         val reportData = DoctorReportData(
             reportDate = endDate,
@@ -67,7 +85,16 @@ class DoctorReportRepository(
             medicationSummary = buildMedicationSummary(activeMeds, window, medicationEvents),
             symptomSummary = buildSymptomSummary(window),
             lifestyleSummary = buildLifestyleSummary(window),
-            aiInsightsSummary = buildAiInsightsSummary()
+            aiInsightsSummary = buildAiInsightsSummary(),
+            overallFeelingDistribution = buildOverallFeelingDistribution(rawEntries),
+            followUpSummary = buildFollowUpSummary(rawEntries),
+            anomalies = enhanced?.anomalies ?: emptyList(),
+            detailedTrends = enhanced?.trendAnalysis ?: emptyMap(),
+            weekOverWeekChange = if (timeWindow <= 7) enhanced?.weekOverWeekChange else null,
+            improvements = enhanced?.improvements ?: emptyList(),
+            concernPatterns = enhanced?.concernPatterns ?: emptyList(),
+            moodScaleAverage = moodAvg,
+            energyLevelAverage = energyAvg
         )
         
         reportData
@@ -164,7 +191,8 @@ class DoctorReportRepository(
                 average = metric.average,
                 latestValue = metric.latestValue,
                 trend = metric.trend,
-                trendDescription = getTrendDescription(metric.trend)
+                trendDescription = getTrendDescription(metric.trend),
+                highCount = 0 // 由 InsightSymptomMetric 不含 highCount，用0兜底
             )
         } ?: emptyList()
         
@@ -187,7 +215,10 @@ class DoctorReportRepository(
             napSummary = formatNapDistribution(window.napDistribution, window.entryCount),
             stepsSummary = formatStepsDistribution(window.stepsDistribution, window.entryCount),
             chillExposureDays = window.chillDays,
-            menstrualSummary = formatMenstrualSummary(window.menstrualCounts)
+            menstrualSummary = formatMenstrualSummary(window.menstrualCounts),
+            sleepDistribution = window.sleepDistribution,
+            napDistribution = window.napDistribution,
+            stepsDistribution = window.stepsDistribution
         )
     }
 
@@ -200,20 +231,94 @@ class DoctorReportRepository(
         
         // 解析AI结果JSON
         val aiResult = try {
-            kotlinx.serialization.json.Json.decodeFromString<WeeklyInsightPayload>(
-                latestInsight.aiResultJson ?: return null
-            )
+            kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                .decodeFromString<WeeklyInsightPayload>(
+                    latestInsight.aiResultJson ?: return null
+                )
         } catch (e: Exception) {
             return null
         }
         
         return AiInsightsSummaryForReport(
-            weeklyInsights = aiResult.highlights.take(3),
-            topSuggestions = aiResult.suggestions.take(3)
+            weeklyInsights = aiResult.highlights.take(5),
+            topSuggestions = aiResult.suggestions.take(5),
+            summary = aiResult.summary,
+            cautions = aiResult.cautions,
+            confidence = aiResult.confidence
         )
     }
 
-    // Helper functions
+    // ========== v4.0 新增 builder 方法 ==========
+
+    /**
+     * 统计 overall_feeling 的分布 (great/ok/unwell/awful → count)
+     */
+    private fun buildOverallFeelingDistribution(
+        entries: List<DailyEntryWithResponses>
+    ): Map<String, Int> {
+        val counts = mutableMapOf("great" to 0, "ok" to 0, "unwell" to 0, "awful" to 0)
+        entries.forEach { entry ->
+            val feeling = entry.responses
+                .firstOrNull { it.questionId == "overall_feeling" }
+                ?.answerValue
+            if (feeling != null && feeling in counts) {
+                counts[feeling] = counts[feeling]!! + 1
+            }
+        }
+        return counts
+    }
+
+    /**
+     * 聚合随访回答 → Map<症状中文名, List<"标签×N">>
+     */
+    private fun buildFollowUpSummary(
+        entries: List<DailyEntryWithResponses>
+    ): Map<String, List<String>> {
+        // 收集所有 stepIndex==2 的回答
+        val fuResponses = entries.flatMap { entry ->
+            entry.responses.filter { it.stepIndex == 2 }
+        }
+        if (fuResponses.isEmpty()) return emptyMap()
+
+        // 按症状分组
+        val symptomMap = mapOf(
+            "fu_headache_" to "头痛",
+            "fu_neck_" to "颈肩腰",
+            "fu_stomach_" to "胃部",
+            "fu_nasal_" to "鼻咽",
+            "fu_knee_" to "膝盖"
+        )
+
+        val result = mutableMapOf<String, MutableMap<String, Int>>()
+        fuResponses.forEach { resp ->
+            val symptomName = symptomMap.entries
+                .firstOrNull { resp.questionId.startsWith(it.key) }?.value
+                ?: return@forEach
+            val labelMap = result.getOrPut(symptomName) { mutableMapOf() }
+            val label = resp.answerLabel.ifBlank { resp.answerValue }
+            labelMap[label] = (labelMap[label] ?: 0) + 1
+        }
+
+        return result.mapValues { (_, labelMap) ->
+            labelMap.map { (label, count) ->
+                if (count > 1) "${label}×$count" else label
+            }
+        }
+    }
+
+    /**
+     * 从 InsightWindow 提取 mood_scale 和 energy_level 的均值
+     */
+    private fun extractMoodAndEnergy(window: InsightWindow?): Pair<Double?, Double?> {
+        if (window == null) return null to null
+        val moodAvg = window.symptomMetrics
+            .firstOrNull { it.questionId == "mood_scale" }?.average
+        val energyAvg = window.symptomMetrics
+            .firstOrNull { it.questionId == "energy_level" }?.average
+        return moodAvg to energyAvg
+    }
+
+    // ========== Helper functions ==========
     private fun getSymptomDisplayName(questionId: String): String {
         return when (questionId) {
             "headache_intensity" -> "头痛"

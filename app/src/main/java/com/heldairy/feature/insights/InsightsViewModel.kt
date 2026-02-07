@@ -60,22 +60,8 @@ class InsightsViewModel(
     val uiState: StateFlow<InsightsUiState> = _uiState
 
     init {
+        // 先快速加载本地统计，延迟加载周洞察
         refreshData()
-        checkAndAutoGenerateWeekly()
-    }
-    
-    private fun checkAndAutoGenerateWeekly() {
-        viewModelScope.launch {
-            val today = java.time.LocalDate.now()
-            // 只在周日自动生成
-            if (today.dayOfWeek == java.time.DayOfWeek.SUNDAY) {
-                val weekly = weeklyInsightCoordinator.getWeeklyInsight()
-                // 如果本周还没有生成，自动生成
-                if (weekly.status == WeeklyInsightStatus.Pending) {
-                    refreshWeekly(force = true)
-                }
-            }
-        }
     }
 
     fun selectWindow(type: InsightWindowType) {
@@ -95,14 +81,21 @@ class InsightsViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             runCatching {
+                // 先加载本地统计，让UI快速显示
                 val summary = insightRepository.buildLocalSummary()
-                val weekly = weeklyInsightCoordinator.getWeeklyInsight()
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        summary = summary,
-                        weeklyInsight = WeeklyInsightUi(status = weekly.status, result = weekly)
+                        summary = summary
                     )
+                }
+                
+                // 延迟加载周洞察（不阻塞UI）
+                launch {
+                    val weekly = weeklyInsightCoordinator.getWeeklyInsight()
+                    _uiState.update {
+                        it.copy(weeklyInsight = WeeklyInsightUi(status = weekly.status, result = weekly))
+                    }
                 }
             }.onFailure { throwable ->
                 _uiState.update { it.copy(isLoading = false, error = throwable.message) }

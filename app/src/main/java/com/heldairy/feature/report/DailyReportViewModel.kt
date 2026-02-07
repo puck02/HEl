@@ -516,7 +516,8 @@ class DailyReportViewModel(
 
     private fun preloadRecentTrends() {
         viewModelScope.launch {
-            val entries = repository.loadRecentEntries(limit = 3)
+            // 优化：只查询2条历史记录用于趋势计算
+            val entries = repository.loadRecentEntries(limit = 2)
             val trends = computeTrends(entries)
             recentTrends.value = trends
         }

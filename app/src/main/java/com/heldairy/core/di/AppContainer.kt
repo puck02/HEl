@@ -15,6 +15,7 @@ import com.heldairy.core.database.DailyReportDatabase
 import com.heldairy.core.network.DeepSeekApi
 import com.heldairy.core.network.DeepSeekClient
 import com.heldairy.core.preferences.AiPreferencesStore
+import com.heldairy.core.preferences.DailyReportPreferencesStore
 import com.heldairy.core.preferences.UserProfileStore
 import com.heldairy.feature.medication.MedicationRepository
 import com.heldairy.feature.medication.MedicationNlpParser
@@ -42,6 +43,7 @@ interface AppContainer {
     val medicationNlpParser: MedicationNlpParser
     val medicationInfoSummaryGenerator: MedicationInfoSummaryGenerator
     val doctorReportRepository: DoctorReportRepository
+    val dailyReportPreferencesStore: DailyReportPreferencesStore
 }
 
 class AppContainerImpl(context: Context) : AppContainer {
@@ -129,6 +131,9 @@ class AppContainerImpl(context: Context) : AppContainer {
     override val doctorReportRepository: DoctorReportRepository = DoctorReportRepository(
         insightRepository = insightRepository,
         medicationRepository = medicationRepository,
-        medicationDao = database.medicationDao()
+        medicationDao = database.medicationDao(),
+        dailyReportDao = database.dailyReportDao()
     )
+
+    override val dailyReportPreferencesStore: DailyReportPreferencesStore = DailyReportPreferencesStore(context)
 }

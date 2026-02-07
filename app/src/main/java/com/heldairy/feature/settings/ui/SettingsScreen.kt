@@ -160,6 +160,7 @@ fun SettingsRoute(
                 onSaveApiKey = viewModel::saveApiKey,
                 onClearApiKey = viewModel::clearApiKey,
                 onAiEnabledChanged = viewModel::onAiEnabledChanged,
+                onDailyReminderEnabledChanged = viewModel::onDailyReminderEnabledChanged,
                 onUserNameChanged = viewModel::onUserNameChanged,
                 onSaveUserName = viewModel::saveUserName,
                 onAvatarSelected = { uri -> viewModel.updateAvatar(uri?.toString()) },
@@ -182,6 +183,7 @@ fun SettingsScreen(
     onSaveApiKey: () -> Unit,
     onClearApiKey: () -> Unit,
     onAiEnabledChanged: (Boolean) -> Unit,
+    onDailyReminderEnabledChanged: (Boolean) -> Unit,
     onUserNameChanged: (String) -> Unit,
     onSaveUserName: () -> Unit,
     onAvatarSelected: (Uri?) -> Unit,
@@ -240,6 +242,37 @@ fun SettingsScreen(
                 Switch(
                     checked = state.aiEnabled,
                     onCheckedChange = onAiEnabledChanged
+                )
+            }
+        }
+        
+        // 日报提醒开关
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            ),
+            shape = RoundedCornerShape(CornerRadius.Medium),
+            elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.M),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.S)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "🎀 日报提醒", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "每晚20:00 Kitty小管家会来提醒你填写日报哦~",
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = state.dailyReminderEnabled,
+                    onCheckedChange = onDailyReminderEnabledChanged
                 )
             }
         }

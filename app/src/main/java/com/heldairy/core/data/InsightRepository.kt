@@ -19,7 +19,8 @@ class InsightRepository(
 ) {
 
     suspend fun buildLocalSummary(endDate: LocalDate = LocalDate.now(clock)): InsightLocalSummary = withContext(ioDispatcher) {
-        val entries = dailyReportRepository.loadRecentEntries(limit = 40)
+        // 优化：只查询31条记录（30天窗口+1天冗余）
+        val entries = dailyReportRepository.loadRecentEntries(limit = 31)
         InsightCalculator.buildSummary(entries, endDate)
     }
 

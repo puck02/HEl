@@ -88,6 +88,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.annotation.DrawableRes
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalView
@@ -155,18 +158,18 @@ class MainActivity : ComponentActivity() {
 data class ConciergeTab(
     val title: String,
     val description: String,
-    val icon: ImageVector
+    @DrawableRes val iconRes: Int
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HElDairyApp() {
     val tabs = listOf(
-        ConciergeTab("首页", "生活管家陪伴你", Icons.AutoMirrored.Outlined.Chat),
-        ConciergeTab("日报", "记录今日状态", Icons.AutoMirrored.Outlined.EventNote),
-        ConciergeTab("洞察", "趋势与总结", Icons.AutoMirrored.Outlined.TrendingUp),
-        ConciergeTab("用药", "药品与疗程", Icons.Outlined.Medication),
-        ConciergeTab("设置", "偏好与导出", Icons.Outlined.Settings)
+        ConciergeTab("首页", "生活管家陪伴你", R.drawable.bow),
+        ConciergeTab("日报", "记录今日状态", R.drawable.cake01),
+        ConciergeTab("洞察", "趋势与总结", R.drawable.cake02),
+        ConciergeTab("用药", "药品与疗程", R.drawable.milkshake),
+        ConciergeTab("设置", "偏好与导出", R.drawable.strawberry)
     )
 
     val isPreview = LocalInspectionMode.current
@@ -1051,11 +1054,11 @@ private fun IOSStyleNavigationBar(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        imageVector = tab.icon,
+                    Image(
+                        painter = painterResource(id = tab.iconRes),
                         contentDescription = tab.title,
-                        modifier = Modifier.size(24.dp),
-                        tint = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant
+                        modifier = Modifier.size(28.dp),
+                        alpha = if (isSelected) 1f else 0.5f
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(

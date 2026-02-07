@@ -184,7 +184,6 @@ fun InsightsRoute(
 			InsightsScreen(
 				state = state,
 				onSelectWindow = viewModel::selectWindow,
-				onRetryWeekly = { viewModel.refreshWeekly(force = true) },
 				onGeneratePreview = { viewModel.generatePreview() },
 				onClearReportStatus = viewModel::clearReportStatus,
 				onSetReportDateRange = viewModel::setReportDateRange,
@@ -198,7 +197,6 @@ fun InsightsRoute(
 fun InsightsScreen(
 	state: InsightsUiState,
 	onSelectWindow: (InsightWindowType) -> Unit,
-	onRetryWeekly: () -> Unit,
 	onGeneratePreview: () -> Unit,
 	onClearReportStatus: () -> Unit,
 	onSetReportDateRange: (LocalDate?, LocalDate?) -> Unit,
@@ -228,7 +226,6 @@ fun InsightsScreen(
 			item {
 				WeeklyInsightCard(
 					weekly = state.weeklyInsight,
-					onRetry = onRetryWeekly,
 					onOpen = { showWeeklyExpanded = true }
 				)
 			}
@@ -451,12 +448,12 @@ private fun InsightGrid(window: InsightWindow) {
 
 @Composable
 private fun SleepQualityCard(window: InsightWindow) {
+	// Keys must match InsightCalculator: "lt6", "6_7", "7_8", "gt8"
 	val buckets = listOf(
-		SleepSegment(label = "≥9h", key = "9+", midpoint = 9.5f, color = MaterialTheme.colorScheme.primary),
-		SleepSegment(label = "8-9h", key = "8-9", midpoint = 8.5f, color = MaterialTheme.colorScheme.secondary),
-		SleepSegment(label = "7-8h", key = "7-8", midpoint = 7.5f, color = MaterialTheme.colorScheme.tertiary),
-		SleepSegment(label = "6-7h", key = "6-7", midpoint = 6.5f, color = MaterialTheme.colorScheme.warning),
-		SleepSegment(label = "<6h", key = "<6", midpoint = 5f, color = MaterialTheme.colorScheme.semanticError)
+		SleepSegment(label = "≥8h", key = "gt8", midpoint = 8.5f, color = MaterialTheme.colorScheme.primary),
+		SleepSegment(label = "7-8h", key = "7_8", midpoint = 7.5f, color = MaterialTheme.colorScheme.secondary),
+		SleepSegment(label = "6-7h", key = "6_7", midpoint = 6.5f, color = MaterialTheme.colorScheme.tertiary),
+		SleepSegment(label = "<6h", key = "lt6", midpoint = 5f, color = MaterialTheme.colorScheme.semanticError)
 	).map { segment -> segment.copy(value = window.sleepDistribution[segment.key] ?: 0) }
 
 	val total = buckets.sumOf { it.value }.coerceAtLeast(1)
@@ -539,11 +536,13 @@ private fun SymptomGrid(metrics: List<InsightSymptomMetric>) {
 private data class SleepSegment(val label: String, val key: String, val midpoint: Float, val color: Color, val value: Int = 0)
 private data class MoodRow(val label: String, val percent: Int, val color: Color)
 
+// Keys must match: "gt8", "7_8", "6_7", "lt6"
 private fun bucketWeight(segment: SleepSegment): Int = when (segment.key) {
-	">8" -> 95
-	"7-8" -> 90
-	"6-7" -> 75
-	else -> 55
+	"gt8" -> 95
+	"7_8" -> 90
+	"6_7" -> 75
+	"lt6" -> 55
+	else -> 50
 }
 
 private fun formatHours(hours: Double): String {
@@ -689,7 +688,7 @@ private fun symptomLabel(questionId: String): String = when (questionId) {
 }
 
 @Composable
-private fun WeeklyInsightCard(weekly: WeeklyInsightUi, onRetry: () -> Unit, onOpen: () -> Unit) {
+private fun WeeklyInsightCard(weekly: WeeklyInsightUi, onOpen: () -> Unit) {
 	val hasPayload = weekly.result?.payload != null
 
 	val clickableModifier = Modifier.clickable { onOpen() }
@@ -716,17 +715,6 @@ private fun WeeklyInsightCard(weekly: WeeklyInsightUi, onRetry: () -> Unit, onOp
 					Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.XXS)) {
 						Text(text = "AI 洞察建议", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
 						Text(text = "每周会生成 AI 洞察建议，点击查看", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = if (hasPayload) 1f else 0.7f))
-					}
-					if (weekly.status == WeeklyInsightStatus.Error) {
-						Button(
-							onClick = onRetry,
-							colors = ButtonDefaults.buttonColors(
-								containerColor = MaterialTheme.colorScheme.primary,
-								contentColor = MaterialTheme.colorScheme.onPrimary
-							)
-						) {
-							Text("重试")
-						}
 					}
 				}
 				weekly.result?.payload?.let { payload ->

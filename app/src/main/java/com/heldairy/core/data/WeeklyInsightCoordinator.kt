@@ -20,10 +20,13 @@ class WeeklyInsightCoordinator(
 
     suspend fun getWeeklyInsight(force: Boolean = false): WeeklyInsightResult {
         val today = LocalDate.now(clock)
-        val weekRange = InsightWeekRange.forDate(today)
+        // 计算最近完成的周（上周一到上周日）
+        val weekRange = InsightWeekRange.forLastCompletedWeek(today)
+        
+        // 先快速查找该周是否已有缓存
         val cached = insightRepository.findInsightForWeek(weekRange.start)
-            ?: insightRepository.latestInsight()?.takeIf { !force }
 
+        // 如果该周已有成功的洞察，且不强制刷新，直接返回（快速路径）
         cached?.let { entity ->
             if (entity.status == STATUS_SUCCESS && !force) {
                 val payload = entity.aiResultJson?.let { runCatching { json.decodeFromString<WeeklyInsightPayload>(it) }.getOrNull() }
@@ -37,15 +40,8 @@ class WeeklyInsightCoordinator(
             }
         }
 
-        if (!force && today.dayOfWeek != DayOfWeek.SUNDAY && (cached == null || cached.status != STATUS_SUCCESS)) {
-            return WeeklyInsightResult(
-                status = WeeklyInsightStatus.Pending,
-                payload = null,
-                generatedAt = null,
-                weekRange = weekRange,
-                message = "周日会生成最新洞察"
-            )
-        }
+        // 如果该周还未生成过（或失败过），则生成新的洞察
+        // 不再限制只能在周日生成
 
         val settings = preferencesStore.currentSettings()
         if (!settings.aiEnabled) {
@@ -173,11 +169,25 @@ object WeeklyInsightPromptBuilder {
 
 data class InsightWeekRange(val start: LocalDate, val end: LocalDate) {
     companion object {
-        fun forDate(date: LocalDate): InsightWeekRange {
-            val lastSunday = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY))
+        /**
+         * 计算最近完成的周（周一到周日）
+         * - 如果今天是周一到周日，返回上一个完整周
+         * - 例如：今天是2026-02-09(周一)，返回2026-01-27(周一)到2026-02-02(周日)
+         */
+        fun forLastCompletedWeek(date: LocalDate): InsightWeekRange {
+            // 找到上一个周日（不包括今天）
+            val lastSunday = if (date.dayOfWeek == DayOfWeek.SUNDAY) {
+                date.minusDays(7)
+            } else {
+                date.with(TemporalAdjusters.previous(DayOfWeek.SUNDAY))
+            }
+            // 周一是7天前
             val weekStart = lastSunday.minusDays(6)
             return InsightWeekRange(start = weekStart, end = lastSunday)
         }
+        
+        @Deprecated("Use forLastCompletedWeek instead", ReplaceWith("forLastCompletedWeek(date)"))
+        fun forDate(date: LocalDate): InsightWeekRange = forLastCompletedWeek(date)
     }
 }
 
