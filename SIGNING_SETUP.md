@@ -10,7 +10,14 @@ Android系统要求所有APK必须经过数字签名才能安装。本地编译�
 
 ### 第一步：准备keystore的Base64编码
 
-已生成文件：`app/keystore.jks.base64`（3337字节）
+已生成文件：`app/keystore.jks.base64`（3665字节）
+
+**重要：新keystore已生成并验证**
+- 密钥别名：`heldairy`
+- 密钥库密码：`heldairy2024`
+- 密钥密码：`heldairy2024`
+- 有效期：27年（至2053年）
+- 算法：RSA 2048位
 
 ### 第二步：在GitHub仓库配置Secrets
 
