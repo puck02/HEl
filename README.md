@@ -22,13 +22,13 @@ HElDairy 是一个面向 Android（Android 10+）的原型应用，目标为提�
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) 
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue.svg)](https://kotlinlang.org/) 
 [![Android](https://img.shields.io/badge/Android-10%2B-brightgreen.svg)](https://developer.android.com)
-[![GitHub release](https://img.shields.io/github/v/release/yourusername/HEl?include_prereleases)](https://github.com/yourusername/HEl/releases)
+[![GitHub release](https://img.shields.io/github/v/release/puck02/HEl?include_prereleases)](https://github.com/puck02/HEl/releases)
 
 ## 📥 下载安装
 
-**最新版本**: [点击这里下载最新APK](https://github.com/yourusername/HEl/releases/latest)
+**最新版本**: [点击这里下载最新APK](https://github.com/puck02/HEl/releases/latest)
 
-查看所有版本：[Releases页面](https://github.com/yourusername/HEl/releases)
+查看所有版本：[Releases页面](https://github.com/puck02/HEl/releases)
 
 ### 安装说明
 1. 下载对应的APK文件（推荐Release版本）

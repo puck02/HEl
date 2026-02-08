@@ -48,12 +48,12 @@ git push origin v1.0.1
 ```
 
 ### 5. 等待自动构建
-- 访问 [GitHub Actions](https://github.com/yourusername/HEl/actions)
+- 访问 [GitHub Actions](https://github.com/puck02/HEl/actions)
 - 查看构建状态（通常需要5-10分钟）
 - 构建成功后会自动创建Release并上传APK
 
 ### 6. 检查Release
-- 访问 [Releases页面](https://github.com/yourusername/HEl/releases)
+- 访问 [Releases页面](https://github.com/puck02/HEl/releases)
 - 确认APK文件已上传
 - 必要时编辑Release说明
 
@@ -61,7 +61,7 @@ git push origin v1.0.1
 
 如果需要手动触发构建（不发布tag）：
 
-1. 访问 [Actions页面](https://github.com/yourusername/HEl/actions/workflows/build-release.yml)
+1. 访问 [Actions页面](https://github.com/puck02/HEl/actions/workflows/build-release.yml)
 2. 点击 "Run workflow"
 3. 选择分支并运行
 4. 构建的APK会作为Artifact保存（90天）
@@ -136,10 +136,10 @@ git push --delete origin v1.0.1
 ```
 
 ### Q: 如何修改已发布的Release说明？
-访问 [Releases页面](https://github.com/yourusername/HEl/releases)，点击对应版本的编辑按钮。
+访问 [Releases页面](https://github.com/puck02/HEl/releases)，点击对应版本的编辑按钮。
 
 ### Q: 构建失败怎么办？
-1. 查看 [Actions页面](https://github.com/yourusername/HEl/actions) 的错误日志
+1. 查看 [Actions页面](https://github.com/puck02/HEl/actions) 的错误日志
 2. 修复问题后重新提交
 3. 删除错误的tag并重新创建
 

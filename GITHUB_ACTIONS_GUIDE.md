@@ -60,12 +60,12 @@ git push origin v1.0.0
 ```
 
 3. **查看构建进度**
-   - 访问: https://github.com/yourusername/HEl/actions
+   - 访问: https://github.com/puck02/HEl/actions
    - 等待5-10分钟构建完成
    - 绿色✅表示成功，红色❌表示失败
 
 4. **检查Release**
-   - 访问: https://github.com/yourusername/HEl/releases
+   - 访问: https://github.com/puck02/HEl/releases
    - 确认APK已上传
    - 测试下载并安装
 
@@ -122,7 +122,7 @@ git push origin v1.0.2
    - 保存
 
 3. **更新README中的链接**
-   - 将`yourusername`替换为你的GitHub用户名
+   - 将`puck02`替换为你的GitHub用户名
    - 或使用完整仓库路径
 
 ### 可选配置（Release签名）
@@ -296,6 +296,6 @@ GitHub Release支持：
 ---
 
 **重要提示**: 
-1. 记得将README.md中的`yourusername`替换为你的GitHub用户名
+1. 记得将README.md中的`puck02`替换为你的GitHub用户名
 2. 首次推送tag前确保代码已经过完整测试
 3. Release版本建议配置签名密钥以提供正式签名的APK
