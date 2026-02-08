@@ -1,0 +1,15 @@
+# Gradle本地配置示例
+# 将此文件复制为 gradle.properties 并根据你的环境修改
+
+# JVM参数配置（通用）
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+kotlin.code.style=official
+android.nonTransitiveRClass=true
+
+# 本地Java路径（可选，macOS示例）
+# 如果你使用Homebrew安装的JDK，取消下面的注释
+# org.gradle.java.home=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+
+# 如果你使用系统JDK或Android Studio自带的JDK，不需要设置此项
+# GitHub Actions会自动使用setup-java配置的JDK
