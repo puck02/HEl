@@ -64,4 +64,18 @@ class InsightRepository(
     suspend fun clearAll() = withContext(ioDispatcher) {
         dao.clearAllInsights()
     }
+
+    suspend fun getInsightForWeek(weekStartDate: String): InsightReportEntity? = withContext(ioDispatcher) {
+        dao.findInsightByWeekStart(weekStartDate)
+    }
+
+    /**
+     * 删除指定日期之前的所有 Insight 报告
+     * 
+     * @param beforeDate ISO 8601 格式日期字符串（如 "2026-01-01"）
+     * @return 被删除的记录数
+     */
+    suspend fun deleteInsightsBefore(beforeDate: String): Int = withContext(ioDispatcher) {
+        dao.deleteInsightsBefore(beforeDate)
+    }
 }

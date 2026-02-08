@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -166,7 +167,7 @@ fun DailyReportScreen(
         // Time suggestion hint
         item {
             Text(
-                text = "建议每晚 20:00 后填写日报记录",
+                text = stringResource(R.string.report_time_suggestion),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier.fillMaxWidth(),
@@ -200,7 +201,7 @@ fun DailyReportScreen(
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = "记录睡前状态，让我更了解你的健康规律",
+                            text = stringResource(R.string.report_sleep_record_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
                             textAlign = TextAlign.Center
@@ -292,7 +293,7 @@ private fun DailyHeader(carePrompt: String) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "$greeting，今天 Kitty 陪你记录状态～",
+                    text = greeting + stringResource(R.string.report_greeting),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -500,7 +501,7 @@ private fun MultiChoiceSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "已选 ${state.selectedOptionIds.size}/${state.maxSelection}",
+                text = stringResource(R.string.report_multi_selected, state.selectedOptionIds.size, state.maxSelection),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -620,15 +621,15 @@ private fun SubmitBar(
                                 strokeWidth = 2.dp,
                                 color = MaterialTheme.colorScheme.onPrimary
                             )
-                            Text("正在保存…")
+                            Text(stringResource(R.string.report_saving))
                         }
                     } else {
-                        Text("完成今日基础问题")
+                        Text(stringResource(R.string.report_complete_basics))
                     }
                 }
             }
             Text(
-                text = "需要调整？可重新填写，我会以最新记录为准。",
+                text = stringResource(R.string.report_adjust_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
@@ -666,13 +667,13 @@ private fun AdviceSection(
                 modifier = Modifier.offset(x = (-4).dp)
             )
             Text(
-                text = "Hello Kitty 今日建议",
+                text = stringResource(R.string.report_advice_title),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f)
             )
             Icon(
                 imageVector = if (adviceState.isCollapsed) Icons.Outlined.ExpandMore else Icons.Outlined.ExpandLess,
-                contentDescription = if (adviceState.isCollapsed) "展开" else "收起"
+                contentDescription = if (adviceState.isCollapsed) stringResource(R.string.cd_expand) else stringResource(R.string.cd_collapse)
             )
         }
 
@@ -691,11 +692,11 @@ private fun AdviceSection(
                     onMarkNotHelpful = onMarkNotHelpful
                 )
                 adviceState.errorMessage != null -> AdviceErrorCard(adviceState.errorMessage, onRetry)
-                else -> AdviceInfoCard("完成基础问题后，Kitty 会马上生成个性化建议～")
+                else -> AdviceInfoCard(stringResource(R.string.report_advice_coming))
             }
             if (adviceState.canRequestAdvice) {
                 TextButton(onClick = onRetry, enabled = !adviceState.isGenerating) {
-                    Text("重新生成 Kitty 建议")
+                    Text(stringResource(R.string.report_regenerate_advice))
                 }
             }
         }
@@ -724,7 +725,7 @@ private fun AdviceLoadingCard() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            Text("Kitty 正在整理建议，请稍等一下下～")
+            Text(stringResource(R.string.report_generating_hint))
         }
     }
 }
@@ -739,7 +740,7 @@ private fun AdviceErrorCard(message: String, onRetry: () -> Unit) {
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
             Button(onClick = onRetry) {
-                Text("重试生成")
+                Text(stringResource(R.string.report_retry_generate))
             }
         }
     }
@@ -767,24 +768,24 @@ private fun AdviceResultCard(
         ) {
             generatedAt?.let {
                 Text(
-                    text = "生成时间：${formatTimestamp(it)}",
+                    text = stringResource(R.string.report_generated_time, formatTimestamp(it)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             if (isFallback || payload.source == AdviceSource.FALLBACK) {
                 Text(
-                    text = "AI 建议暂时不可用，以下是 Kitty 的基础建议～",
+                    text = stringResource(R.string.report_fallback_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.tertiary
                 )
             }
             if (!isCollapsed) {
-                AdviceListBlock(title = "观察", items = payload.observations)
-                AdviceListBlock(title = "建议", items = payload.actions)
-                AdviceListBlock(title = "明日关注", items = payload.tomorrowFocus)
+                AdviceListBlock(title = stringResource(R.string.report_advice_observations), items = payload.observations)
+                AdviceListBlock(title = stringResource(R.string.report_advice_actions), items = payload.actions)
+                AdviceListBlock(title = stringResource(R.string.report_advice_tomorrow), items = payload.tomorrowFocus)
                 if (payload.redFlags.isNotEmpty()) {
-                    AdviceListBlock(title = "提醒", items = payload.redFlags)
+                    AdviceListBlock(title = stringResource(R.string.report_advice_reminders), items = payload.redFlags)
                 }
                 
                 // Phase 3: 反馈按钮
@@ -799,7 +800,7 @@ private fun AdviceResultCard(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Kitty 的建议对你有帮助吗～",
+                            text = stringResource(R.string.report_feedback_question),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -807,7 +808,7 @@ private fun AdviceResultCard(
                         IconButton(onClick = onMarkHelpful, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 imageVector = Icons.Default.ThumbUp,
-                                contentDescription = "有帮助",
+                                contentDescription = stringResource(R.string.cd_helpful),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -815,7 +816,7 @@ private fun AdviceResultCard(
                         IconButton(onClick = onMarkNotHelpful, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 imageVector = Icons.Default.ThumbDown,
-                                contentDescription = "无帮助",
+                                contentDescription = stringResource(R.string.cd_not_helpful),
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -826,9 +827,9 @@ private fun AdviceResultCard(
                     val feedback = trackingItems.firstOrNull()?.userFeedback
                     Text(
                         text = when(feedback) {
-                            UserFeedback.HELPFUL -> "✓ 已标记为有帮助"
-                            UserFeedback.NOT_HELPFUL -> "✓ 已标记为无帮助"
-                            UserFeedback.EXECUTED -> "✓ 已执行"
+                            UserFeedback.HELPFUL -> stringResource(R.string.report_feedback_helpful)
+                            UserFeedback.NOT_HELPFUL -> stringResource(R.string.report_feedback_not_helpful)
+                            UserFeedback.EXECUTED -> stringResource(R.string.report_feedback_executed)
                             else -> ""
                         },
                         style = MaterialTheme.typography.bodySmall,

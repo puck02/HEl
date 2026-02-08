@@ -64,8 +64,7 @@ data class WeeklyInsightPayload(
     fun validationErrors(): List<String> {
         val errors = mutableListOf<String>()
         if (summary.isBlank()) errors += "summary_empty"
-        if (highlights.isEmpty()) errors += "highlights_empty"
-        if (suggestions.isEmpty()) errors += "suggestions_empty"
+        // 放宽验证：允许highlights/suggestions为空，因为是新用户可能没有足够数据
         if (weekStartDate.isBlank() || weekEndDate.isBlank()) errors += "week_range_missing"
         if (confidence !in setOf("low", "medium", "high")) errors += "confidence_invalid"
         return errors

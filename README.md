@@ -19,9 +19,26 @@ HElDairy 是一个面向 Android（Android 10+）的原型应用，目标为提�
 - 语言：Kotlin
 # HElDairy — AI 私人健康管家
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue.svg)](https://kotlinlang.org/) [![Android](https://img.shields.io/badge/Android-10%2B-brightgreen.svg)](https://developer.android.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) 
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue.svg)](https://kotlinlang.org/) 
+[![Android](https://img.shields.io/badge/Android-10%2B-brightgreen.svg)](https://developer.android.com)
+[![GitHub release](https://img.shields.io/github/v/release/yourusername/HEl?include_prereleases)](https://github.com/yourusername/HEl/releases)
 
-简介
+## 📥 下载安装
+
+**最新版本**: [点击这里下载最新APK](https://github.com/yourusername/HEl/releases/latest)
+
+查看所有版本：[Releases页面](https://github.com/yourusername/HEl/releases)
+
+### 安装说明
+1. 下载对应的APK文件（推荐Release版本）
+2. 在Android设备上启用"允许安装未知来源应用"
+3. 打开下载的APK文件进行安装
+4. 首次使用请在设置中配置DeepSeek API Key（[获取API Key](https://platform.deepseek.com/)）
+
+---
+
+## 简介
 ---
 HElDairy 是一个面向 Android（Android 10+）的原型应用，提供“生活管家”式的每日健康对话：记录日常指标、按规则触发跟进问题，并在可用时调用 DeepSeek AI 生成非诊断性的生活方式建议。应用以本地优先为原则，用户健康数据默认仅保存在设备上。
 

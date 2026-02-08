@@ -88,10 +88,18 @@ dependencies {
 
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
+    implementation("androidx.room:room-paging:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
+
+    // Paging 3 for large datasets
+    implementation("androidx.paging:paging-runtime-ktx:3.2.1")
+    implementation("androidx.paging:paging-compose:3.2.1")
 
     // WorkManager for background tasks
     implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Jetpack Security for encrypted storage
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Lottie for elegant animations
     implementation("com.airbnb.android:lottie-compose:6.3.0")

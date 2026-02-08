@@ -43,7 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.heldairy.R
 import com.heldairy.feature.medication.AddEvent
 import com.heldairy.feature.medication.AddMedicationViewModel
 
@@ -74,10 +76,10 @@ fun AddMedicationRoute(
         modifier = Modifier.padding(paddingValues),
         topBar = {
             TopAppBar(
-                title = { Text("添加用药") },
+                title = { Text(stringResource(R.string.medication_add)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
                     }
                 }
             )
@@ -123,8 +125,8 @@ fun AddMedicationRoute(
                         value = uiState.naturalInput,
                         onValueChange = viewModel::onNaturalInput,
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("描述你的用药（自然语言）") },
-                        placeholder = { Text("例如：阿莫西林胶囊，每次2粒，一天3次，饭后吃") },
+                        label = { Text(stringResource(R.string.medication_description_label)) },
+                        placeholder = { Text(stringResource(R.string.medication_description_placeholder)) },
                         minLines = 3,
                         enabled = !uiState.isParsing
                     )
@@ -153,7 +155,7 @@ fun AddMedicationRoute(
                                 onClick = viewModel::parseNaturalInput,
                                 enabled = uiState.naturalInput.isNotBlank()
                             ) {
-                                Text("解析")
+                                Text(stringResource(R.string.medication_parse))
                             }
                         }
                     }
@@ -171,7 +173,7 @@ fun AddMedicationRoute(
                 value = uiState.name,
                 onValueChange = viewModel::onNameChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("药物名称 *") },
+                label = { Text(stringResource(R.string.medication_name_required)) },
                 singleLine = true
             )
 
@@ -179,39 +181,39 @@ fun AddMedicationRoute(
                 value = uiState.aliases,
                 onValueChange = viewModel::onAliasesChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("别名（用，分隔）") },
-                placeholder = { Text("例如：感冒灵，泰诺") }
+                label = { Text(stringResource(R.string.medication_aliases_label)) },
+                placeholder = { Text(stringResource(R.string.medication_aliases_placeholder)) }
             )
 
             OutlinedTextField(
                 value = uiState.frequency,
                 onValueChange = viewModel::onFrequencyChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("服用频率") },
-                placeholder = { Text("例如：每日3次") }
+                label = { Text(stringResource(R.string.medication_frequency_label)) },
+                placeholder = { Text(stringResource(R.string.medication_frequency_placeholder)) }
             )
 
             OutlinedTextField(
                 value = uiState.dose,
                 onValueChange = viewModel::onDoseChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("单次剂量") },
-                placeholder = { Text("例如：2粒") }
+                label = { Text(stringResource(R.string.medication_dose_label)) },
+                placeholder = { Text(stringResource(R.string.medication_dose_placeholder)) }
             )
 
             OutlinedTextField(
                 value = uiState.timeHints,
                 onValueChange = viewModel::onTimeHintsChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("时间提示") },
-                placeholder = { Text("例如：饭后、睡前") }
+                label = { Text(stringResource(R.string.medication_time_hints_label)) },
+                placeholder = { Text(stringResource(R.string.medication_time_hints_placeholder)) }
             )
 
             OutlinedTextField(
                 value = uiState.note,
                 onValueChange = viewModel::onNoteChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("备注") },
+                label = { Text(stringResource(R.string.medication_note_label)) },
                 minLines = 2
             )
 
@@ -228,7 +230,7 @@ fun AddMedicationRoute(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("保存")
+                    Text(stringResource(R.string.action_save))
                 }
             }
         }
@@ -238,7 +240,7 @@ fun AddMedicationRoute(
     showConfirmDialog?.let { dialog ->
         AlertDialog(
             onDismissRequest = { showConfirmDialog = null },
-            title = { Text("该药品正在服用中") },
+            title = { Text(stringResource(R.string.medication_active_conflict_title)) },
             text = { 
                 Text("「${dialog.existingCourseName}」当前正在进行疗程。是否结束当前疗程并开启新疗程？")
             },
@@ -252,12 +254,12 @@ fun AddMedicationRoute(
                         showConfirmDialog = null
                     }
                 ) {
-                    Text("结束并开启新疗程")
+                    Text(stringResource(R.string.medication_end_and_start_new))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showConfirmDialog = null }) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )

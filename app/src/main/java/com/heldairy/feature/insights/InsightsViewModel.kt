@@ -68,11 +68,21 @@ class InsightsViewModel(
         _uiState.update { it.copy(selectedWindow = type) }
     }
 
-    fun refreshWeekly(force: Boolean = false) {
+    /**
+     * 刷新每周洞察（自动判断是否需要生成）
+     * - 周日首次打开：自动调用LLM生成本周洞察
+     * - 非周日：显示上周的洞察
+     * - 数据为空/失败：自动重新生成
+     */
+    fun refreshWeekly() {
         viewModelScope.launch {
-            val weekly = weeklyInsightCoordinator.getWeeklyInsight(force)
+            _uiState.update { it.copy(isLoading = true) }
+            val weekly = weeklyInsightCoordinator.getWeeklyInsight()
             _uiState.update { state ->
-                state.copy(weeklyInsight = WeeklyInsightUi(status = weekly.status, result = weekly))
+                state.copy(
+                    isLoading = false,
+                    weeklyInsight = WeeklyInsightUi(status = weekly.status, result = weekly)
+                )
             }
         }
     }

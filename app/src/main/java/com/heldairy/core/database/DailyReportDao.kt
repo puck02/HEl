@@ -80,6 +80,9 @@ interface DailyReportDao {
     @Query("SELECT * FROM insight_reports ORDER BY week_end_date DESC")
     suspend fun loadAllInsights(): List<InsightReportEntity>
 
+    @Query("DELETE FROM insight_reports WHERE week_start_date < :beforeDate")
+    suspend fun deleteInsightsBefore(beforeDate: String): Int
+
     @Transaction
     @Query("SELECT * FROM daily_entries WHERE id = :entryId LIMIT 1")
     suspend fun getEntryWithResponses(entryId: Long): DailyEntryWithResponses?
@@ -91,6 +94,16 @@ interface DailyReportDao {
     @Transaction
     @Query("SELECT * FROM daily_entries ORDER BY created_at DESC")
     suspend fun loadAllSnapshots(): List<DailyEntrySnapshot>
+
+    /**
+     * 分页加载日报快照（用于大数据集场景）
+     * 
+     * 返回 PagingSource 供 Paging 3 库使用，自动处理分页逻辑。
+     * 推荐用于历史记录列表、导出预览等场景。
+     */
+    @Transaction
+    @Query("SELECT * FROM daily_entries ORDER BY created_at DESC")
+    fun loadSnapshotsPaged(): androidx.paging.PagingSource<Int, DailyEntrySnapshot>
 
     @Query("DELETE FROM daily_advice")
     suspend fun clearAdvice()

@@ -65,10 +65,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.heldairy.R
 import com.heldairy.feature.medication.CourseStatus
 import com.heldairy.feature.medication.DetailEvent
 import com.heldairy.feature.medication.MedCourse
@@ -169,8 +171,8 @@ fun MedicationDetailRoute(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("确认删除") },
-            text = { Text("删除后将无法恢复，确定要删除这个药品吗？") },
+            title = { Text(stringResource(R.string.medication_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.medication_delete_confirm_message)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -181,12 +183,12 @@ fun MedicationDetailRoute(
                         containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("删除")
+                    Text(stringResource(R.string.action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -195,8 +197,8 @@ fun MedicationDetailRoute(
     if (showEndCourseDialog) {
         AlertDialog(
             onDismissRequest = { showEndCourseDialog = false },
-            title = { Text("结束疗程") },
-            text = { Text("确定要结束当前疗程吗？结束后可以重新开始新疗程。") },
+            title = { Text(stringResource(R.string.medication_end_course_title)) },
+            text = { Text(stringResource(R.string.medication_end_course_message)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -204,12 +206,12 @@ fun MedicationDetailRoute(
                         showEndCourseDialog = false
                     }
                 ) {
-                    Text("确认")
+                    Text(stringResource(R.string.action_confirm))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showEndCourseDialog = false }) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -218,8 +220,8 @@ fun MedicationDetailRoute(
     showDeleteCourseDialog?.let { courseId ->
         AlertDialog(
             onDismissRequest = { showDeleteCourseDialog = null },
-            title = { Text("删除疗程") },
-            text = { Text("确定要删除此疗程记录吗？") },
+            title = { Text(stringResource(R.string.medication_delete_course_title)) },
+            text = { Text(stringResource(R.string.medication_delete_course_message)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -230,12 +232,12 @@ fun MedicationDetailRoute(
                         containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("删除")
+                    Text(stringResource(R.string.action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteCourseDialog = null }) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -244,7 +246,7 @@ fun MedicationDetailRoute(
     if (showSummaryDialog) {
         AlertDialog(
             onDismissRequest = { showSummaryDialog = false },
-            title = { Text("药品简介") },
+            title = { Text(stringResource(R.string.medication_info_title)) },
             text = {
                 Text(
                     text = uiState.med?.infoSummary ?: "暂无简介",
@@ -253,7 +255,7 @@ fun MedicationDetailRoute(
             },
             confirmButton = {
                 TextButton(onClick = { showSummaryDialog = false }) {
-                    Text("关闭")
+                    Text(stringResource(R.string.action_close))
                 }
             }
         )
@@ -507,26 +509,26 @@ private fun CurrentCourseCard(
             }
             val daysElapsed = ChronoUnit.DAYS.between(course.startDate, endDateForCalculation)
             Text(
-                text = "开始日期: ${course.startDate} (已持续 $daysElapsed 天)",
+                text = stringResource(R.string.medication_course_start_info, course.startDate, daysElapsed),
                 style = MaterialTheme.typography.bodyMedium
             )
 
             Spacer(modifier = Modifier.height(Spacing.XS))
             Text(
-                text = "频率: ${course.frequencyText}",
+                text = stringResource(R.string.medication_course_frequency_info, course.frequencyText),
                 style = MaterialTheme.typography.bodyMedium
             )
 
             if (!course.doseText.isNullOrBlank()) {
                 Text(
-                    text = "剂量: ${course.doseText}",
+                    text = stringResource(R.string.medication_course_dose_info, course.doseText!!),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
 
             if (!course.timeHints.isNullOrBlank()) {
                 Text(
-                    text = "用药时间: ${course.timeHints}",
+                    text = stringResource(R.string.medication_course_time_info, course.timeHints!!),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -549,7 +551,7 @@ private fun CurrentCourseCard(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("暂停")
+                            Text(stringResource(R.string.medication_pause))
                         }
                         Button(
                             onClick = { onEnd() },
@@ -561,7 +563,7 @@ private fun CurrentCourseCard(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("结束")
+                            Text(stringResource(R.string.medication_end))
                         }
                     }
                     CourseStatus.PAUSED -> {
@@ -575,7 +577,7 @@ private fun CurrentCourseCard(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("恢复")
+                            Text(stringResource(R.string.medication_resume))
                         }
                         OutlinedButton(
                             onClick = { onEnd() },
@@ -587,7 +589,7 @@ private fun CurrentCourseCard(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("结束")
+                            Text(stringResource(R.string.medication_end))
                         }
                     }
                     CourseStatus.ENDED -> {
@@ -606,7 +608,7 @@ private fun CurrentCourseCard(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("已停用")
+                            Text(stringResource(R.string.medication_ended))
                         }
                         Button(
                             onClick = { onResume(course) },
@@ -618,7 +620,7 @@ private fun CurrentCourseCard(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("开启新疗程")
+                            Text(stringResource(R.string.medication_start_new_course))
                         }
                     }
                 }
@@ -772,7 +774,7 @@ private fun EditModeContent(
             OutlinedTextField(
                 value = editMode.editName,
                 onValueChange = onNameChanged,
-                label = { Text("药品名称 *") },
+                label = { Text(stringResource(R.string.medication_name_required)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -780,7 +782,7 @@ private fun EditModeContent(
             OutlinedTextField(
                 value = editMode.editAliases,
                 onValueChange = onAliasesChanged,
-                label = { Text("别名（多个用逗号分隔）") },
+                label = { Text(stringResource(R.string.medication_aliases_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -788,7 +790,7 @@ private fun EditModeContent(
             OutlinedTextField(
                 value = editMode.editNote,
                 onValueChange = onNoteChanged,
-                label = { Text("备注") },
+                label = { Text(stringResource(R.string.medication_note_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2
             )
@@ -796,7 +798,7 @@ private fun EditModeContent(
             OutlinedTextField(
                 value = editMode.editFrequency,
                 onValueChange = onFrequencyChanged,
-                label = { Text("频率（例如：每日3次）") },
+                label = { Text(stringResource(R.string.medication_frequency_edit_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -804,7 +806,7 @@ private fun EditModeContent(
             OutlinedTextField(
                 value = editMode.editDose,
                 onValueChange = onDoseChanged,
-                label = { Text("剂量（例如：每次1片）") },
+                label = { Text(stringResource(R.string.medication_dose_edit_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -812,7 +814,7 @@ private fun EditModeContent(
             OutlinedTextField(
                 value = editMode.editTimeHints,
                 onValueChange = onTimeHintsChanged,
-                label = { Text("用药时间（例如：早中晚）") },
+                label = { Text(stringResource(R.string.medication_time_hints_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -824,11 +826,11 @@ private fun EditModeContent(
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(onClick = onCancel) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
                 Spacer(modifier = Modifier.width(Spacing.XS))
                 Button(onClick = onSave) {
-                    Text("保存")
+                    Text(stringResource(R.string.action_save))
                 }
             }
         }
@@ -904,20 +906,20 @@ private fun RemindersCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "用药提醒",
+                    text = stringResource(R.string.medication_reminders_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 AssistChip(
                     onClick = onAddReminder,
-                    label = { Text("添加提醒") }
+                    label = { Text(stringResource(R.string.medication_time_hints_label)) }
                 )
             }
 
             if (reminders.isEmpty()) {
                 Spacer(modifier = Modifier.height(Spacing.S))
                 Text(
-                    text = "还没有设置提醒",
+                    text = stringResource(R.string.medication_no_reminders),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -940,8 +942,8 @@ private fun RemindersCard(
     if (reminderToDelete != null) {
         AlertDialog(
             onDismissRequest = { reminderToDelete = null },
-            title = { Text("删除提醒") },
-            text = { Text("确定要删除这个用药提醒吗？") },
+            title = { Text(stringResource(R.string.action_delete) + stringResource(R.string.medication_time_hints_label)) },
+            text = { Text(stringResource(R.string.medication_delete_reminder_confirm)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -949,12 +951,12 @@ private fun RemindersCard(
                         reminderToDelete = null
                     }
                 ) {
-                    Text("删除", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { reminderToDelete = null }) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -964,11 +966,11 @@ private fun RemindersCard(
     if (showPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showPermissionDialog = false },
-            title = { Text("需要通知权限") },
-            text = { Text("为了在指定时间提醒您用药，应用需要发送通知的权限。请在系统设置中手动开启通知权限。") },
+            title = { Text(stringResource(R.string.notification_permission_title)) },
+            text = { Text(stringResource(R.string.notification_permission_message)) },
             confirmButton = {
                 TextButton(onClick = { showPermissionDialog = false }) {
-                    Text("知道了")
+                    Text(stringResource(R.string.notification_permission_ok))
                 }
             }
         )
@@ -1279,7 +1281,7 @@ private fun ReminderEditDialog(
                                 onUpdateState { state -> state.copy(startDate = date) }
                             } catch (_: Exception) {}
                         },
-                        label = { Text("开始日期 (YYYY-MM-DD)") },
+                        label = { Text(stringResource(R.string.medication_reminder_start_date)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -1294,7 +1296,7 @@ private fun ReminderEditDialog(
                                 onUpdateState { state -> state.copy(endDate = date) }
                             } catch (_: Exception) {}
                         },
-                        label = { Text("结束日期 (YYYY-MM-DD)") },
+                        label = { Text(stringResource(R.string.medication_reminder_end_date)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -1305,7 +1307,7 @@ private fun ReminderEditDialog(
                 OutlinedTextField(
                     value = dialogState.title,
                     onValueChange = { onUpdateState { state -> state.copy(title = it) } },
-                    label = { Text("提醒标题（可选）") },
+                    label = { Text(stringResource(R.string.medication_reminder_title_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -1315,7 +1317,7 @@ private fun ReminderEditDialog(
                 OutlinedTextField(
                     value = dialogState.message,
                     onValueChange = { onUpdateState { state -> state.copy(message = it) } },
-                    label = { Text("提醒消息（可选）") },
+                    label = { Text(stringResource(R.string.medication_reminder_message_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     maxLines = 3
                 )
@@ -1323,12 +1325,12 @@ private fun ReminderEditDialog(
         },
         confirmButton = {
             Button(onClick = onConfirm) {
-                Text("保存")
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )

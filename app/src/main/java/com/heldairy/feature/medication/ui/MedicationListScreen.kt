@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -146,9 +147,9 @@ private fun MedicationListScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.M),
-                placeholder = { Text("搜索药品名称或别名") },
+                placeholder = { Text(stringResource(R.string.medication_search_placeholder)) },
                 leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = "搜索")
+                    Icon(Icons.Default.Search, contentDescription = stringResource(R.string.cd_search))
                 },
                 singleLine = true
             )
@@ -173,28 +174,28 @@ private fun MedicationListScreen(
                     FilterChip(
                         selected = uiState.filterStatus == MedFilterStatus.ALL,
                         onClick = { onFilterStatusChange(MedFilterStatus.ALL) },
-                        label = { Text("全部") }
+                        label = { Text(stringResource(R.string.filter_all)) }
                     )
                 }
                 item {
                     FilterChip(
                         selected = uiState.filterStatus == MedFilterStatus.ACTIVE,
                         onClick = { onFilterStatusChange(MedFilterStatus.ACTIVE) },
-                        label = { Text("正在服用") }
+                        label = { Text(stringResource(R.string.filter_active)) }
                     )
                 }
                 item {
                     FilterChip(
                         selected = uiState.filterStatus == MedFilterStatus.PAUSED,
                         onClick = { onFilterStatusChange(MedFilterStatus.PAUSED) },
-                        label = { Text("已暂停") }
+                        label = { Text(stringResource(R.string.filter_paused)) }
                     )
                 }
                 item {
                     FilterChip(
                         selected = uiState.filterStatus == MedFilterStatus.ENDED,
                         onClick = { onFilterStatusChange(MedFilterStatus.ENDED) },
-                        label = { Text("已结束") }
+                        label = { Text(stringResource(R.string.filter_ended)) }
                     )
                 }
             }
@@ -207,7 +208,7 @@ private fun MedicationListScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("加载中...", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.loading), style = MaterialTheme.typography.bodyLarge)
                     }
                 }
                 uiState.displayedMeds.isEmpty() -> {
@@ -217,7 +218,7 @@ private fun MedicationListScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "无符合条件的药品",
+                                stringResource(R.string.medication_no_match),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -333,7 +334,7 @@ private fun MedicationCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (med.hasActiveCourse) "正在服用" else "已停用",
+                    text = if (med.hasActiveCourse) stringResource(R.string.medication_status_active) else stringResource(R.string.medication_status_stopped),
                     style = MaterialTheme.typography.bodySmall,
                     color = statusColor
                 )

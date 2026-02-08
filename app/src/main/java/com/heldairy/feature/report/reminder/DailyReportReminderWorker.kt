@@ -34,9 +34,7 @@ class DailyReportReminderWorker(
             // Show notification
             showNotification(message)
             
-            // Schedule next reminder for tomorrow
-            DailyReportReminderScheduler.scheduleReminder(applicationContext)
-            
+            // PeriodicWorkRequest 会自动调度下次执行，无需手动调度
             android.util.Log.d(TAG, "Daily report reminder sent successfully")
             Result.success()
         } catch (e: Exception) {

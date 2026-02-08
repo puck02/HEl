@@ -1,9 +1,9 @@
 package com.heldairy.feature.report.reminder
 
 import android.content.Context
-import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.time.Duration
 import java.time.LocalDateTime
@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Scheduler for daily report reminders
- * Schedules notifications at 20:00 (8 PM) every day
+ * Schedules notifications at 20:00 (8 PM) every day using PeriodicWorkRequest
  */
 object DailyReportReminderScheduler {
     
@@ -23,7 +23,7 @@ object DailyReportReminderScheduler {
     private val DEFAULT_REMINDER_TIME = LocalTime.of(20, 0)
 
     /**
-     * Schedule the next daily report reminder at 20:00
+     * Schedule daily report reminder to run every day at 20:00
      */
     fun scheduleReminder(context: Context) {
         val delay = calculateDelayUntilNextReminder()
@@ -33,20 +33,28 @@ object DailyReportReminderScheduler {
             "Scheduling daily report reminder in ${delay.toMinutes()} minutes (${delay.toHours()} hours)"
         )
 
-        val workRequest = OneTimeWorkRequestBuilder<DailyReportReminderWorker>()
+        val constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(false) // 允许低电量时执行，因为这是用户期望的功能
+            .build()
+
+        val workRequest = PeriodicWorkRequestBuilder<DailyReportReminderWorker>(
+            repeatInterval = 1, // 每1天重复
+            repeatIntervalTimeUnit = TimeUnit.DAYS
+        )
             .setInitialDelay(delay.toMillis(), TimeUnit.MILLISECONDS)
+            .setConstraints(constraints)
             .addTag(WORK_TAG)
             .build()
 
-        WorkManager.getInstance(context).enqueueUniqueWork(
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WORK_NAME,
-            ExistingWorkPolicy.REPLACE,
+            ExistingPeriodicWorkPolicy.UPDATE, // 更新现有任务
             workRequest
         )
         
         android.util.Log.d(
             DailyReportReminderWorker.TAG,
-            "Daily report reminder scheduled successfully"
+            "Daily report reminder scheduled successfully as periodic work"
         )
     }
 

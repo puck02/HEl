@@ -5,6 +5,7 @@ import com.heldairy.core.data.AdvicePayload
 import com.heldairy.core.data.AiFollowUpQuestionDto
 import com.heldairy.core.data.WeeklyInsightPayload
 import java.security.MessageDigest
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -16,14 +17,25 @@ import kotlinx.serialization.json.jsonPrimitive
 
 class DeepSeekClient(
     private val api: DeepSeekApi,
+    private val networkMonitor: NetworkMonitor,
     private val json: Json = Json { ignoreUnknownKeys = true }
 ) {
+    /**
+     * 检查网络连接状态，无网络时抛出异常
+     */
+    private suspend fun ensureNetworkAvailable() {
+        if (!networkMonitor.isCurrentlyConnected()) {
+            throw NetworkUnavailableException("无网络连接，请检查您的网络设置")
+        }
+    }
+
     suspend fun fetchAdvice(
         apiKey: String,
         model: String,
         systemPrompt: String,
         userPrompt: String
     ): AdvicePayload {
+        ensureNetworkAvailable()
         val request = DeepSeekRequest(
             model = model,
             messages = listOf(
@@ -46,6 +58,7 @@ class DeepSeekClient(
         systemPrompt: String,
         userPrompt: String
     ): List<AiFollowUpQuestionDto> {
+        ensureNetworkAvailable()
         val request = DeepSeekRequest(
             model = model,
             messages = listOf(
@@ -68,6 +81,7 @@ class DeepSeekClient(
         systemPrompt: String,
         userPrompt: String
     ): WeeklyInsightPayload {
+        ensureNetworkAvailable()
         val request = DeepSeekRequest(
             model = model,
             messages = listOf(
@@ -302,3 +316,9 @@ class DeepSeekClient(
 }
 
 class AdvicePayloadFormatException(message: String) : IllegalStateException(message)
+
+/**
+ * 网络不可用异常
+ * 当调用 API 前检测到无网络连接时抛出
+ */
+class NetworkUnavailableException(message: String) : Exception(message)

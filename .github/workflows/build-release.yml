@@ -1,0 +1,127 @@
+name: Build and Release APK
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # 当推送 v1.0.0 这样的tag时触发
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+      
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      
+      - name: Extract version info
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="debug-$(date +%Y%m%d-%H%M%S)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+      
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+      
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --stacktrace
+        continue-on-error: true  # Release签名可能未配置，允许失败
+      
+      - name: Rename APKs
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p output
+          
+          # Debug APK
+          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp app/build/outputs/apk/debug/app-debug.apk output/HElDairy-${VERSION}-debug.apk
+            echo "✅ Debug APK ready"
+          fi
+          
+          # Release APK (如果存在)
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk output/HElDairy-${VERSION}-release.apk
+            echo "✅ Release APK ready"
+          elif [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            cp app/build/outputs/apk/release/app-release-unsigned.apk output/HElDairy-${VERSION}-release-unsigned.apk
+            echo "⚠️ Release APK unsigned"
+          fi
+          
+          ls -lh output/
+      
+      - name: Get commit message
+        id: commit
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            COMMIT_MSG=$(git tag -l --format='%(contents)' ${GITHUB_REF#refs/tags/} | head -1)
+            if [ -z "$COMMIT_MSG" ]; then
+              COMMIT_MSG=$(git log -1 --pretty=%B)
+            fi
+          else
+            COMMIT_MSG=$(git log -1 --pretty=%B)
+          fi
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: output/*.apk
+          name: HElDairy ${{ steps.version.outputs.version }}
+          body: |
+            ## 📱 HElDairy - AI私人健康生活管家
+            
+            ### 版本信息
+            - **版本号**: ${{ steps.version.outputs.version }}
+            - **构建时间**: ${{ github.event.head_commit.timestamp }}
+            - **提交**: ${{ github.sha }}
+            
+            ### 📥 下载说明
+            - **Debug版本**: 适合测试，包含调试信息，APK较大
+            - **Release版本**: 生产版本，已优化压缩，APK较小
+            
+            ### ✨ 更新内容
+            ${{ steps.commit.outputs.message }}
+            
+            ### 🔧 安装说明
+            1. 下载对应的APK文件
+            2. 在Android设备上启用"未知来源"安装
+            3. 打开APK文件安装
+            4. 首次使用请在设置中配置DeepSeek API Key
+            
+            ### ⚠️ 注意事项
+            - 最低支持 Android 10 (API 29)
+            - 需要网络权限用于AI功能
+            - 所有健康数据均存储在本地
+            
+            ---
+            
+            更多信息请查看 [项目README](https://github.com/${{ github.repository }})
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ steps.version.outputs.version }}
+          path: output/*.apk
+          retention-days: 90

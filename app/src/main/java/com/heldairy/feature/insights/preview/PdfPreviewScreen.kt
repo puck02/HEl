@@ -22,7 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.heldairy.R
 import com.heldairy.ui.theme.CornerRadius
 import com.heldairy.ui.theme.Elevation
 import com.heldairy.ui.theme.Spacing
@@ -93,10 +95,10 @@ fun PdfPreviewScreen(
             TopAppBar(
                 title = { 
                     Column {
-                        Text("报表预览")
+                        Text(stringResource(R.string.pdf_preview_title))
                         if (uiState.pageCount > 0) {
                             Text(
-                                "共 ${uiState.pageCount} 页",
+                                stringResource(R.string.pdf_preview_page_count, uiState.pageCount),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
@@ -105,7 +107,7 @@ fun PdfPreviewScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.cd_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -160,7 +162,7 @@ private fun LoadingView() {
         ) {
             CircularProgressIndicator()
             Text(
-                "正在生成报表预览...",
+                stringResource(R.string.pdf_preview_generating),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
@@ -197,7 +199,7 @@ private fun ErrorView(
                     tint = MaterialTheme.colorScheme.error
                 )
                 Text(
-                    "预览失败",
+                    stringResource(R.string.pdf_preview_failed),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
@@ -209,7 +211,7 @@ private fun ErrorView(
                 Button(onClick = onRetry) {
                     Icon(Icons.Outlined.Refresh, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("重新生成")
+                    Text(stringResource(R.string.pdf_preview_retry))
                 }
             }
         }
@@ -262,7 +264,7 @@ private fun PdfPageItem(
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                 ) {
                     Text(
-                        "第 $pageNumber 页 / 共 $totalPages 页",
+                        stringResource(R.string.pdf_preview_page_indicator, pageNumber, totalPages),
                         modifier = Modifier.padding(horizontal = Spacing.M, vertical = Spacing.S),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
@@ -273,7 +275,7 @@ private fun PdfPageItem(
             // PDF页面图像
             Image(
                 bitmap = bitmap.asImageBitmap(),
-                contentDescription = "第 $pageNumber 页",
+                contentDescription = stringResource(R.string.cd_page_description, pageNumber),
                 modifier = Modifier.fillMaxWidth(),
                 contentScale = ContentScale.FillWidth
             )
@@ -311,7 +313,7 @@ private fun PdfPreviewBottomBar(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(4.dp))
-                Text("重新生成")
+                Text(stringResource(R.string.pdf_preview_regenerate))
             }
 
             // 分享按钮
@@ -326,7 +328,7 @@ private fun PdfPreviewBottomBar(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(4.dp))
-                Text("分享")
+                Text(stringResource(R.string.pdf_preview_share))
             }
 
             // 保存PDF按钮
@@ -342,7 +344,7 @@ private fun PdfPreviewBottomBar(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("保存中...")
+                    Text(stringResource(R.string.pdf_preview_saving))
                 } else {
                     Icon(
                         Icons.Outlined.Download,
@@ -350,7 +352,7 @@ private fun PdfPreviewBottomBar(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text("保存PDF")
+                    Text(stringResource(R.string.pdf_preview_save))
                 }
             }
         }

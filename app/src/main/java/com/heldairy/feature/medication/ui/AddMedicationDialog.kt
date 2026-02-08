@@ -25,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.res.stringResource
+import com.heldairy.R
 import com.heldairy.ui.theme.HElDairyTheme
 import java.time.LocalDate
 
@@ -56,14 +58,14 @@ fun AddMedicationDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "添加药品",
+                    text = stringResource(R.string.medication_add_title),
                     style = MaterialTheme.typography.titleLarge
                 )
 
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("药品名称") },
+                    label = { Text(stringResource(R.string.medication_name_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -71,8 +73,8 @@ fun AddMedicationDialog(
                 OutlinedTextField(
                     value = frequency,
                     onValueChange = { frequency = it },
-                    label = { Text("用药频率") },
-                    placeholder = { Text("例如：每日3次") },
+                    label = { Text(stringResource(R.string.medication_frequency_label)) },
+                    placeholder = { Text(stringResource(R.string.medication_frequency_placeholder)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -80,8 +82,8 @@ fun AddMedicationDialog(
                 OutlinedTextField(
                     value = dose,
                     onValueChange = { dose = it },
-                    label = { Text("剂量（可选）") },
-                    placeholder = { Text("例如：每次1片") },
+                    label = { Text(stringResource(R.string.medication_dose_label) + stringResource(R.string.medication_optional)) },
+                    placeholder = { Text(stringResource(R.string.medication_dose_placeholder)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -89,8 +91,8 @@ fun AddMedicationDialog(
                 OutlinedTextField(
                     value = timeHints,
                     onValueChange = { timeHints = it },
-                    label = { Text("用药时间（可选）") },
-                    placeholder = { Text("例如：早 / 中 / 晚") },
+                    label = { Text(stringResource(R.string.medication_time_hints_label) + stringResource(R.string.medication_optional)) },
+                    placeholder = { Text(stringResource(R.string.medication_time_example_short)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -102,7 +104,7 @@ fun AddMedicationDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("取消")
+                        Text(stringResource(R.string.action_cancel))
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -119,7 +121,7 @@ fun AddMedicationDialog(
                         },
                         enabled = name.isNotBlank() && frequency.isNotBlank()
                     ) {
-                        Text("添加")
+                        Text(stringResource(R.string.action_add))
                     }
                 }
             }

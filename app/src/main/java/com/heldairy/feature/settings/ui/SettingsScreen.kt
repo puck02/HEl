@@ -70,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -111,12 +112,12 @@ fun SettingsRoute(
                     .onSuccess { content ->
                         val writeResult = writeTextToUri(context, uri, content)
                         if (writeResult.isSuccess) {
-                            viewModel.showMessage("JSON 导出完成")
+                            viewModel.showMessage(context.getString(R.string.settings_export_json) + " 完成")
                         } else {
-                            viewModel.showMessage(writeResult.exceptionOrNull()?.message ?: "导出失败")
+                            viewModel.showMessage(writeResult.exceptionOrNull()?.message ?: context.getString(R.string.error_unknown))
                         }
                     }
-                    .onFailure { viewModel.showMessage(it.message ?: "导出失败") }
+                    .onFailure { viewModel.showMessage(it.message ?: context.getString(R.string.error_unknown)) }
             }
         }
     }
@@ -130,12 +131,12 @@ fun SettingsRoute(
                 if (readResult.isSuccess) {
                     val importResult = viewModel.importJson(readResult.getOrThrow())
                     if (importResult.isSuccess) {
-                        viewModel.showMessage("导入完成，已覆盖现有数据")
+                        viewModel.showMessage(context.getString(R.string.settings_import_json) + " 完成")
                     } else {
-                        viewModel.showMessage(importResult.exceptionOrNull()?.message ?: "导入失败")
+                        viewModel.showMessage(importResult.exceptionOrNull()?.message ?: context.getString(R.string.error_unknown))
                     }
                 } else {
-                    viewModel.showMessage(readResult.exceptionOrNull()?.message ?: "读取文件失败")
+                    viewModel.showMessage(readResult.exceptionOrNull()?.message ?: context.getString(R.string.error_unknown))
                 }
             }
         }
@@ -193,8 +194,6 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
-    var showApiKey by remember { mutableStateOf(false) }
-    var showClearDataDialog by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -216,37 +215,113 @@ fun SettingsScreen(
             onAvatarSelected = onAvatarSelected
         )
         
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-            ),
-            shape = RoundedCornerShape(CornerRadius.Medium),
-            elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(Spacing.M),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.S)
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "启用 AI 管家", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = "开启智能健康分析助手",
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = state.aiEnabled,
-                    onCheckedChange = onAiEnabledChanged
-                )
-            }
-        }
+        AiToggleSection(
+            aiEnabled = state.aiEnabled,
+            onAiEnabledChanged = onAiEnabledChanged
+        )
         
         // 日报提醒开关
+        DailyReminderSection(
+            enabled = state.dailyReminderEnabled,
+            onChanged = onDailyReminderEnabledChanged
+        )
+
+        ApiKeySection(
+            apiKeyInput = state.apiKeyInput,
+            isApiKeyDirty = state.isApiKeyDirty,
+            isSaving = state.isSaving,
+            onApiKeyChanged = onApiKeyChanged,
+            onSave = onSaveApiKey,
+            onClear = onClearApiKey
+        )
+
+        BackupSection(
+            onExportJson = onExportJson,
+            onImportJson = onImportJson
+        )
+
+        DataManagementSection(onClearAllData = onClearAllData)
+    }
+}
+
+@Composable
+private fun AiToggleSection(
+    aiEnabled: Boolean,
+    onAiEnabledChanged: (Boolean) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+        ),
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.M),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.S)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = stringResource(R.string.settings_ai_enable), style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                Text(
+                    text = stringResource(R.string.settings_ai_enable_description),
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(checked = aiEnabled, onCheckedChange = onAiEnabledChanged)
+        }
+    }
+}
+
+@Composable
+private fun DailyReminderSection(
+    enabled: Boolean,
+    onChanged: (Boolean) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+        ),
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.M),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.S)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = stringResource(R.string.settings_daily_reminder), style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                Text(
+                    text = stringResource(R.string.settings_daily_reminder_description),
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onChanged)
+        }
+    }
+}
+
+@Composable
+private fun ApiKeySection(
+    apiKeyInput: String,
+    isApiKeyDirty: Boolean,
+    isSaving: Boolean,
+    onApiKeyChanged: (String) -> Unit,
+    onSave: () -> Unit,
+    onClear: () -> Unit
+) {
+    var showApiKey by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
+        Text(text = stringResource(R.string.settings_api_key_label), style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
         Card(
             colors = CardDefaults.cardColors(
                 containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
@@ -255,171 +330,121 @@ fun SettingsScreen(
             elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
+            OutlinedTextField(
+                value = apiKeyInput,
+                onValueChange = onApiKeyChanged,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(Spacing.M),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.S)
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "🎀 日报提醒", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = "每晚20:00 Kitty小管家会来提醒你填写日报哦~",
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = state.dailyReminderEnabled,
-                    onCheckedChange = onDailyReminderEnabledChanged
-                )
-            }
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
-            Text(text = "API Key", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                ),
+                    .padding(horizontal = Spacing.S, vertical = Spacing.XS),
+                visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                placeholder = { Text(stringResource(R.string.settings_api_key_placeholder)) },
+                trailingIcon = {
+                    IconButton(onClick = { showApiKey = !showApiKey }) {
+                        Icon(
+                            imageVector = if (showApiKey) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                            contentDescription = if (showApiKey) stringResource(R.string.cd_hide_password) else stringResource(R.string.cd_show_password),
+                            tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                singleLine = true,
                 shape = RoundedCornerShape(CornerRadius.Medium),
-                elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                OutlinedTextField(
-                    value = state.apiKeyInput,
-                    onValueChange = onApiKeyChanged,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.S, vertical = Spacing.XS),
-                    visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
-                    placeholder = { Text("••••••••••••••••••••••••••••••••") },
-                    trailingIcon = {
-                        IconButton(onClick = { showApiKey = !showApiKey }) {
-                            Icon(
-                                imageVector = if (showApiKey) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                contentDescription = if (showApiKey) "隐藏" else "显示",
-                                tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(CornerRadius.Medium),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
-                        unfocusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                        focusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                        cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                    )
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+                    unfocusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                    focusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                    cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
                 )
-                ActionRow(
-                    isDirty = state.isApiKeyDirty,
-                    isSaving = state.isSaving,
-                    onSave = onSaveApiKey,
-                    onClear = onClearApiKey
-                )
-            }
-            InfoCard(text = "API Key 仅保存在本地，可随时清除。关闭 AI 后仍可保留历史记录。您的隐私对我们至关重要。")
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.XS)
-            ) {
-                Text(text = "数据备份", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-                StickerDecoration(
-                    drawableRes = R.drawable.strawberry,
-                    size = 32.dp,
-                    rotation = 12f,
-                    alpha = 0.55f,
-                    modifier = Modifier.offset(x = 4.dp, y = (-2).dp)
-                )
-            }
-            Text(
-                text = "导出包含所有日报、回答、建议与总结，导入会覆盖当前数据。",
-                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
             )
-            StandardButton(
-                text = "导出 JSON",
-                icon = Icons.Outlined.CloudUpload,
-                onClick = onExportJson,
-                modifier = Modifier.fillMaxWidth()
-            )
-            StandardButton(
-                text = "导入 JSON（覆盖）",
-                icon = Icons.Outlined.CloudDownload,
-                onClick = onImportJson,
-                modifier = Modifier.fillMaxWidth()
+            ActionRow(
+                isDirty = isApiKeyDirty,
+                isSaving = isSaving,
+                onSave = onSave,
+                onClear = onClear
             )
         }
-
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
-            Text(text = "数据管理", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-            Text(
-                text = "清空所有日报记录和用药记录，但会保留用户名、头像和 API Key。清空后数据无法恢复，建议先导出备份。",
-                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            OutlinedActionButton(
-                text = "清空所有数据",
-                icon = Icons.Outlined.DeleteSweep,
-                onClick = { showClearDataDialog = true },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        InfoCard(text = stringResource(R.string.settings_api_key_info))
     }
-    
+}
+
+@Composable
+private fun BackupSection(
+    onExportJson: () -> Unit,
+    onImportJson: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.XS)
+        ) {
+            Text(text = stringResource(R.string.settings_backup_section), style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+            StickerDecoration(
+                drawableRes = R.drawable.strawberry,
+                size = 32.dp,
+                rotation = 12f,
+                alpha = 0.55f,
+                modifier = Modifier.offset(x = 4.dp, y = (-2).dp)
+            )
+        }
+        Text(
+            text = stringResource(R.string.settings_backup_description),
+            style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        StandardButton(
+            text = stringResource(R.string.settings_export_json),
+            icon = Icons.Outlined.CloudUpload,
+            onClick = onExportJson,
+            modifier = Modifier.fillMaxWidth()
+        )
+        StandardButton(
+            text = stringResource(R.string.settings_import_json),
+            icon = Icons.Outlined.CloudDownload,
+            onClick = onImportJson,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun DataManagementSection(onClearAllData: () -> Unit) {
+    var showClearDataDialog by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
+        Text(text = stringResource(R.string.settings_data_section), style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+        Text(
+            text = stringResource(R.string.settings_clear_data_warning),
+            style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        OutlinedActionButton(
+            text = stringResource(R.string.settings_clear_all_data),
+            icon = Icons.Outlined.DeleteSweep,
+            onClick = { showClearDataDialog = true },
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
     if (showClearDataDialog) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showClearDataDialog = false },
-            icon = { 
+            icon = {
                 Icon(
                     imageVector = Icons.Outlined.DeleteSweep,
                     contentDescription = null,
                     tint = androidx.compose.material3.MaterialTheme.colorScheme.error
                 )
             },
-            title = { Text("确认清空所有数据？") },
-            text = {
-                Column {
-                    Text("此操作将清空：")
-                    Text("• 所有日报记录及相关数据", style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-                    Text("• 所有用药记录及提醒", style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "将保留：用户名、头像、API Key",
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "⚠️ 此操作无法撤销！建议先导出备份。",
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.error,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
+            title = { Text(stringResource(R.string.settings_clear_data_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_clear_data_confirm_message)) },
             confirmButton = {
                 Button(
-                    onClick = {
-                        showClearDataDialog = false
-                        onClearAllData()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("确认清空")
-                }
+                    onClick = { showClearDataDialog = false; onClearAllData() },
+                    colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.error)
+                ) { Text(stringResource(R.string.action_confirm)) }
             },
             dismissButton = {
                 TextButton(onClick = { showClearDataDialog = false }) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -441,10 +466,10 @@ private fun ActionRow(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         TextButton(onClick = onSave, enabled = isDirty && !isSaving) {
-            Text(text = if (isSaving) "保存中…" else "保存 API Key")
+            Text(text = if (isSaving) stringResource(R.string.saving) else stringResource(R.string.settings_save_api_key))
         }
         TextButton(onClick = onClear) {
-            Text("清除 API Key", color = androidx.compose.material3.MaterialTheme.colorScheme.primary)
+            Text(stringResource(R.string.settings_clear_api_key), color = androidx.compose.material3.MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -549,7 +574,7 @@ private fun ProfileCard(
     }
     
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
-        Text(text = "用户信息", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+        Text(text = stringResource(R.string.settings_user_profile), style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
         Box(modifier = Modifier.fillMaxWidth()) {
         Card(
             colors = CardDefaults.cardColors(
@@ -590,7 +615,7 @@ private fun ProfileCard(
                         if (avatarUri != null) {
                             AsyncImage(
                                 model = avatarUri,
-                                contentDescription = "头像",
+                                contentDescription = stringResource(R.string.settings_user_profile),
                                 modifier = Modifier
                                     .size(72.dp)
                                     .clip(CircleShape),
@@ -600,7 +625,7 @@ private fun ProfileCard(
                             // 使用 Hello Kitty 作为默认头像
                             Image(
                                 painter = painterResource(id = R.drawable.default_avatar_kitty),
-                                contentDescription = "默认头像",
+                                contentDescription = stringResource(R.string.settings_user_profile),
                                 modifier = Modifier
                                     .size(72.dp)
                                     .clip(CircleShape),
@@ -625,7 +650,7 @@ private fun ProfileCard(
                             )
                         }
                         TextButton(onClick = { isEditingName = !isEditingName }) {
-                            Text(if (isEditingName) "取消" else "修改用户名")
+                            Text(if (isEditingName) stringResource(R.string.action_cancel) else stringResource(R.string.action_edit) + stringResource(R.string.settings_user_name_label))
                         }
                     }
                 }
@@ -638,7 +663,7 @@ private fun ProfileCard(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("保存")
+                        Text(stringResource(R.string.action_save))
                     }
                 }
             }
@@ -672,7 +697,7 @@ private suspend fun writeTextToUri(
             OutputStreamWriter(output, Charsets.UTF_8).use { writer ->
                 writer.write(content)
             }
-        } ?: error("无法写入文件")
+        } ?: error("Write error")
     }
 }
 
@@ -681,7 +706,7 @@ private suspend fun readTextFromUri(context: Context, uri: Uri): Result<String> 
         runCatching {
             context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
                 reader.readText()
-            } ?: error("无法读取文件")
+            } ?: error("Read error")
         }
     }
 

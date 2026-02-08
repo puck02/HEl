@@ -20,15 +20,47 @@ class WeeklyInsightCoordinator(
 
     suspend fun getWeeklyInsight(force: Boolean = false): WeeklyInsightResult {
         val today = LocalDate.now(clock)
-        // 计算最近完成的周（上周一到上周日）
-        val weekRange = InsightWeekRange.forLastCompletedWeek(today)
+        val isSunday = today.dayOfWeek == DayOfWeek.SUNDAY
+        
+        // 周日：查看本周（周一到周日）的洞察
+        // 非周日：查看上周（上周一到上周日）的洞察
+        val weekRange = if (isSunday) {
+            // 今天周日，计算本周一到今天
+            val thisMonday = today.minusDays(6)
+            InsightWeekRange(thisMonday, today)
+        } else {
+            // 非周日，显示上周的完整周
+            InsightWeekRange.forLastCompletedWeek(today)
+        }
         
         // 先快速查找该周是否已有缓存
         val cached = insightRepository.findInsightForWeek(weekRange.start)
 
-        // 如果该周已有成功的洞察，且不强制刷新，直接返回（快速路径）
+        // 判断是否是第一周（无任何历史数据）
+        val localSummary = insightRepository.buildLocalSummary(endDate = weekRange.end)
+        val isFirstWeek = localSummary?.window7?.entryCount == 0 && cached == null
+        
+        if (isFirstWeek && !force) {
+            // 第一周，还没有数据，不尝试生成
+            return WeeklyInsightResult(
+                status = WeeklyInsightStatus.NoData,
+                payload = null,
+                generatedAt = null,
+                weekRange = weekRange,
+                message = "等待你填写更多日报，就会生成 AI 洞察哦！"
+            )
+        }
+
+        // 判断是否需要自动生成：
+        // 1. 周日且本周还没有成功的洞察 → 自动生成
+        // 2. 任何时候数据为空或失败 → 自动重新生成
+        // 3. 已有成功数据且不force → 直接返回
+        val shouldAutoGenerate = (isSunday && cached?.status != STATUS_SUCCESS) || 
+                                 (cached == null) ||
+                                 (cached.status == STATUS_FAILED)
+        
         cached?.let { entity ->
-            if (entity.status == STATUS_SUCCESS && !force) {
+            if (entity.status == STATUS_SUCCESS && !force && !shouldAutoGenerate) {
                 val payload = entity.aiResultJson?.let { runCatching { json.decodeFromString<WeeklyInsightPayload>(it) }.getOrNull() }
                 return WeeklyInsightResult(
                     status = WeeklyInsightStatus.Success,
@@ -40,8 +72,7 @@ class WeeklyInsightCoordinator(
             }
         }
 
-        // 如果该周还未生成过（或失败过），则生成新的洞察
-        // 不再限制只能在周日生成
+        // 需要生成新的洞察（周日首次打开/数据为空/失败/force）
 
         val settings = preferencesStore.currentSettings()
         if (!settings.aiEnabled) {
@@ -63,7 +94,6 @@ class WeeklyInsightCoordinator(
             )
         }
 
-        val localSummary = insightRepository.buildLocalSummary(endDate = weekRange.end)
         val userPrompt = WeeklyInsightPromptBuilder.buildUserPrompt(weekRange, localSummary)
         val payload = try {
             deepSeekClient.fetchWeeklyInsight(
@@ -94,6 +124,8 @@ class WeeklyInsightCoordinator(
         val normalized = payload.normalized()
         val issues = normalized.validationErrors()
         if (issues.isNotEmpty()) {
+            android.util.Log.e("WeeklyInsightCoordinator", "Validation failed: $issues")
+            android.util.Log.e("WeeklyInsightCoordinator", "Payload: summary='${normalized.summary}', highlights=${normalized.highlights.size}, suggestions=${normalized.suggestions.size}")
             insightRepository.saveInsightReport(
                 weekStart = weekRange.start,
                 weekEnd = weekRange.end,
@@ -107,7 +139,7 @@ class WeeklyInsightCoordinator(
                 payload = null,
                 generatedAt = null,
                 weekRange = weekRange,
-                message = "AI 返回格式不正确"
+                message = "AI 返回格式不正确: ${issues.joinToString()}"
             )
         }
 
@@ -133,9 +165,30 @@ class WeeklyInsightCoordinator(
         private const val STATUS_SUCCESS = "success"
         private const val STATUS_FAILED = "failed"
         private val SYSTEM_PROMPT = buildString {
-            appendLine("你是生活管家，帮用户写一段简短的周度洞察，不做医疗诊断，不谈药物调整。")
-            appendLine("参考输入的 7 天/30 天摘要，给出 2-4 句 summary，1-3 条 highlights，1-3 条 suggestions，0-2 条 cautions。")
-            appendLine("输出纯 JSON，不要 Markdown 或额外文字。")
+            appendLine("你是生活管家，帮用户写一段简短的周度健康洞察，不做医疗诊断，不谈药物调整。")
+            appendLine("要求：")
+            appendLine("1. 结合长期记忆（7天/30天数据），针对这一周的情况进行分析")
+            appendLine("2. summary: 2-3句话总结本周整体情况，40-60字")
+            appendLine("3. highlights: 1-2条本周的亮点/进步，每条15-25字")
+            appendLine("4. suggestions: 1-2条具体改善建议，每条20-30字")
+            appendLine("5. cautions: 0-1条需要注意的事项，每条15-25字")
+            appendLine("6. 总字数控制在20字以内")
+            appendLine("7. 语气温柔、理性，像朋友聊天")
+            appendLine("")
+            appendLine("输出JSON格式：")
+            appendLine("""")
+            appendLine("{")
+            appendLine("  \"schema_version\": 1,")
+            appendLine("  \"week_start_date\": \"周一日期\",")
+            appendLine("  \"week_end_date\": \"周日日期\",")
+            appendLine("  \"summary\": \"总结文本\",")
+            appendLine("  \"highlights\": [\"亮点1\", \"亮点2\"],")
+            appendLine("  \"suggestions\": [\"建议1\", \"建议2\"],")
+            appendLine("  \"cautions\": [\"注意事项\"],")
+            appendLine("  \"confidence\": \"medium\"")
+            appendLine("}")
+            appendLine("""")
+            appendLine("不要Markdown或额外文字，只返回JSON。week_start_date和week_end_date必须填写！")
         }
     }
 }
@@ -144,6 +197,8 @@ object WeeklyInsightPromptBuilder {
     fun buildUserPrompt(range: InsightWeekRange, summary: InsightLocalSummary?): String {
         val builder = StringBuilder()
         builder.appendLine("周范围: ${range.start} 至 ${range.end}")
+        builder.appendLine("请在JSON中使用: \"week_start_date\": \"${range.start}\", \"week_end_date\": \"${range.end}\"")
+        builder.appendLine("")
         summary?.window7?.let { window ->
             builder.appendLine("近7天填写: ${window.entryCount}/${window.days} 天，完成率 ${window.completionRate}")
             builder.appendLine("睡眠分布: ${window.sleepDistribution}")
@@ -199,4 +254,4 @@ data class WeeklyInsightResult(
     val message: String?
 )
 
-enum class WeeklyInsightStatus { Success, Pending, Disabled, Error }
+enum class WeeklyInsightStatus { Success, Pending, Disabled, Error, NoData }

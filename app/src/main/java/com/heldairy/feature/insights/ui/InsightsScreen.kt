@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -42,15 +43,19 @@ import androidx.compose.material.icons.automirrored.outlined.TrendingFlat
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.TipsAndUpdates
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Hotel
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.PictureAsPdf
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -78,7 +83,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -113,31 +120,87 @@ private fun WeeklyInsightExpandedOverlay(weekly: WeeklyInsightUi, onClose: () ->
 		) {
 			Column(modifier = Modifier.padding(Spacing.M)) {
 				Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-					Text(text = "AI 洞察建议", style = MaterialTheme.typography.titleMedium)
+					Text(text = stringResource(R.string.insights_ai_advice), style = MaterialTheme.typography.titleMedium)
 					IconButton(onClick = onClose) {
 						Icon(imageVector = Icons.Default.Close, contentDescription = "关闭")
 					}
 				}
 				Spacer(modifier = Modifier.height(Spacing.S))
 				val payload = weekly.result?.payload
-				if (payload != null) {
-					Column(
-						modifier = Modifier.verticalScroll(rememberScrollState()),
-						verticalArrangement = Arrangement.spacedBy(Spacing.S)
-					) {
-						Text(text = payload.summary, style = MaterialTheme.typography.bodyMedium)
-						if (payload.highlights.isNotEmpty()) {
-							Text(text = "重点", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-							payload.highlights.forEach { highlight ->
+				when {
+					payload != null -> {
+						Column(
+							modifier = Modifier.verticalScroll(rememberScrollState()),
+							verticalArrangement = Arrangement.spacedBy(Spacing.S)
+						) {
+							Text(text = payload.summary, style = MaterialTheme.typography.bodyMedium)
+							if (payload.highlights.isNotEmpty()) {
+								Text(text = "重点", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+								payload.highlights.forEach { highlight ->
+										Row(horizontalArrangement = Arrangement.spacedBy(Spacing.XS), verticalAlignment = Alignment.CenterVertically) {
+										Icon(imageVector = Icons.Outlined.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+										Text(text = highlight, style = MaterialTheme.typography.bodyMedium)
+									}
+								}
+							}
+							if (payload.suggestions.isNotEmpty()) {
+								Text(text = "建议", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.secondary)
+								payload.suggestions.forEach { suggestion ->
 									Row(horizontalArrangement = Arrangement.spacedBy(Spacing.XS), verticalAlignment = Alignment.CenterVertically) {
-									Icon(imageVector = Icons.Outlined.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-									Text(text = highlight, style = MaterialTheme.typography.bodyMedium)
+										Icon(imageVector = Icons.Outlined.TipsAndUpdates, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
+										Text(text = suggestion, style = MaterialTheme.typography.bodyMedium)
+									}
+								}
+							}
+							if (payload.cautions.isNotEmpty()) {
+								Text(text = "注意事项", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.error)
+								payload.cautions.forEach { caution ->
+									Row(horizontalArrangement = Arrangement.spacedBy(Spacing.XS), verticalAlignment = Alignment.CenterVertically) {
+										Icon(imageVector = Icons.Outlined.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+										Text(text = caution, style = MaterialTheme.typography.bodyMedium)
+									}
 								}
 							}
 						}
 					}
-				} else {
-					Text(text = "暂时没有可展示的 AI 建议。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+					weekly.status == WeeklyInsightStatus.Pending -> {
+						Box(modifier = Modifier.fillMaxWidth().padding(Spacing.L), contentAlignment = Alignment.Center) {
+							Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.M)) {
+								CircularProgressIndicator()
+								Text("正在生成 AI 洞察...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+							}
+						}
+					}
+					weekly.status == WeeklyInsightStatus.Disabled -> {
+						Text(text = "AI 功能已禁用，请在设置中开启", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+					}
+					weekly.status == WeeklyInsightStatus.Error -> {
+						Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
+							Text(text = weekly.result?.message ?: "生成失败", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+							Text(text = "请检查网络连接和 API Key 设置", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+						}
+					}
+					weekly.status == WeeklyInsightStatus.NoData -> {
+						Column(
+							modifier = Modifier.fillMaxWidth().padding(Spacing.L),
+							horizontalAlignment = Alignment.CenterHorizontally,
+							verticalArrangement = Arrangement.spacedBy(Spacing.M)
+						) {
+							Text(
+								text = "🌱",
+								style = MaterialTheme.typography.displayMedium
+							)
+							Text(
+								text = weekly.result?.message ?: "等待你填写更多日报，就会生成 AI 洞察哦！",
+								style = MaterialTheme.typography.bodyMedium,
+								color = MaterialTheme.colorScheme.onSurfaceVariant,
+								textAlign = TextAlign.Center
+							)
+						}
+					}
+					else -> {
+						Text(text = "暂时没有可展示的 AI 建议。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+					}
 				}
 			}
 		}
@@ -358,7 +421,7 @@ private fun ErrorCard(message: String) {
 		elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None)
 	) {
 		Column(modifier = Modifier.padding(Spacing.M), verticalArrangement = Arrangement.spacedBy(Spacing.XS)) {
-			Text(text = "加载失败", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+			Text(text = stringResource(R.string.insights_error_loading), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onErrorContainer)
 			Text(text = message, color = MaterialTheme.colorScheme.onErrorContainer)
 		}
 	}
@@ -384,12 +447,12 @@ private fun EmptyState() {
 				alpha = 0.6f
 			)
 			Text(
-				text = "暂无数据",
+				text = stringResource(R.string.insights_empty_title),
 				style = MaterialTheme.typography.titleMedium,
 				fontWeight = FontWeight.SemiBold
 			)
 			Text(
-				text = "完成每日填报后，这里会出现你的习惯分布和趋势。",
+				text = stringResource(R.string.insights_empty_message),
 				style = MaterialTheme.typography.bodyMedium,
 				color = MaterialTheme.colorScheme.onSurfaceVariant
 			)
@@ -415,8 +478,8 @@ private fun CompletionCard(window: InsightWindow) {
 				horizontalArrangement = Arrangement.SpaceBetween
 			) {
 				Column(verticalArrangement = Arrangement.spacedBy(Spacing.XS), modifier = Modifier.weight(1f)) {
-					Text(text = "今日进度", style = MaterialTheme.typography.titleMedium)
-					Text(text = "${window.entryCount}/${window.days} 天已完成", color = MaterialTheme.colorScheme.onSurfaceVariant)
+					Text(text = stringResource(R.string.insights_progress_title), style = MaterialTheme.typography.titleMedium)
+					Text(text = stringResource(R.string.insights_progress_days, window.entryCount, window.days), color = MaterialTheme.colorScheme.onSurfaceVariant)
 					LinearProgressIndicator(
 						progress = { (window.entryCount.toFloat() / window.days.toFloat()).coerceIn(0f, 1f) },
 						modifier = Modifier.fillMaxWidth()
@@ -688,7 +751,10 @@ private fun symptomLabel(questionId: String): String = when (questionId) {
 }
 
 @Composable
-private fun WeeklyInsightCard(weekly: WeeklyInsightUi, onOpen: () -> Unit) {
+private fun WeeklyInsightCard(
+	weekly: WeeklyInsightUi, 
+	onOpen: () -> Unit
+) {
 	val hasPayload = weekly.result?.payload != null
 
 	val clickableModifier = Modifier.clickable { onOpen() }
@@ -713,7 +779,7 @@ private fun WeeklyInsightCard(weekly: WeeklyInsightUi, onOpen: () -> Unit) {
 						alpha = 1f
 					)
 					Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.XXS)) {
-						Text(text = "AI 洞察建议", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+						Text(text = stringResource(R.string.insights_ai_advice), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
 						Text(text = "每周会生成 AI 洞察建议，点击查看", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = if (hasPayload) 1f else 0.7f))
 					}
 				}
@@ -723,6 +789,11 @@ private fun WeeklyInsightCard(weekly: WeeklyInsightUi, onOpen: () -> Unit) {
 						Text(text = "点击查看完整建议 ›", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f))
 					}
 				}
+				
+				// 自动生成逻辑：
+				// - 周日首次打开 → 自动调用LLM生成本周洞察
+				// - 非周日 → 显示上周的数据
+				// - 数据为空/失败 → 自动重新生成
 			}
 		}
 	}

@@ -14,9 +14,13 @@ import com.heldairy.core.data.DoctorReportRepository
 import com.heldairy.core.database.DailyReportDatabase
 import com.heldairy.core.network.DeepSeekApi
 import com.heldairy.core.network.DeepSeekClient
+import com.heldairy.core.network.NetworkMonitor
+import com.heldairy.core.network.RetryInterceptor
 import com.heldairy.core.preferences.AiPreferencesStore
 import com.heldairy.core.preferences.DailyReportPreferencesStore
 import com.heldairy.core.preferences.UserProfileStore
+import com.heldairy.core.preferences.SecurePreferencesStore
+import com.heldairy.core.util.Constants
 import com.heldairy.feature.medication.MedicationRepository
 import com.heldairy.feature.medication.MedicationNlpParser
 import com.heldairy.feature.medication.MedicationInfoSummaryGenerator
@@ -44,6 +48,8 @@ interface AppContainer {
     val medicationInfoSummaryGenerator: MedicationInfoSummaryGenerator
     val doctorReportRepository: DoctorReportRepository
     val dailyReportPreferencesStore: DailyReportPreferencesStore
+    val networkMonitor: NetworkMonitor
+    val securePreferencesStore: SecurePreferencesStore
 }
 
 class AppContainerImpl(context: Context) : AppContainer {
@@ -51,10 +57,11 @@ class AppContainerImpl(context: Context) : AppContainer {
     private val json = Json { ignoreUnknownKeys = true }
 
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
-        .callTimeout(90, TimeUnit.SECONDS)
+        .connectTimeout(Constants.Network.CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(Constants.Network.READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .writeTimeout(Constants.Network.WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .callTimeout(Constants.Network.CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .addInterceptor(RetryInterceptor(maxRetries = Constants.Network.RETRY_MAX_ATTEMPTS, baseDelayMs = Constants.Network.RETRY_BASE_DELAY_MS))
         .addInterceptor(
             HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BASIC
@@ -63,7 +70,7 @@ class AppContainerImpl(context: Context) : AppContainer {
         .build()
 
     private val retrofit: Retrofit = Retrofit.Builder()
-        .baseUrl("https://api.deepseek.com/")
+        .baseUrl(Constants.Network.DEEPSEEK_BASE_URL)
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .client(okHttpClient)
         .build()
@@ -87,8 +94,10 @@ class AppContainerImpl(context: Context) : AppContainer {
     
     override val userProfileStore: UserProfileStore = UserProfileStore(context)
     override val aiPreferencesStore: AiPreferencesStore = AiPreferencesStore(context)
+    override val networkMonitor: NetworkMonitor = NetworkMonitor(context)
+    override val securePreferencesStore: SecurePreferencesStore = SecurePreferencesStore(context)
 
-    private val deepSeekClient = DeepSeekClient(deepSeekApi)
+    private val deepSeekClient = DeepSeekClient(deepSeekApi, networkMonitor)
 
     private val adviceTrackingRepository: AdviceTrackingRepository = AdviceTrackingRepository(
         dao = database.dailyReportDao()
