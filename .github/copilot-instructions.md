@@ -1,4 +1,10 @@
 # HElDairy Copilot Instructions
+
+## 🚨 开发流程约束
+- **禁止自动提交与发布**: 编译完成后，**严禁**自动执行 `git commit`、`git push` 或 `git tag` 等操作。必须先向用户说明修改内容并征得明确同意后，才可提交代码或触发 CI/CD。
+- **禁止自动触发 Action**: 创建或推送 Git tag 会触发 GitHub Actions 自动构建，必须获得用户授权后才能执行。
+
+## 项目核心
 - **Project Context**: [requirements.md](../requirements.md) defines an Android 10+ "AI private health concierge" app built with Kotlin, Jetpack Compose, Material 3, Room, ViewModel + StateFlow, Retrofit/OkHttp, and kotlinx.serialization.
 - **Target Experience**: The core flow is a single conversational daily report that adapts follow-up questions and delivers same-session lifestyle advice; no generic forms or medical diagnoses.
 - **Dialogue Flow**: Implement Step 0 greetings (2 fixed multiple-choice questions), Step 1 baseline metrics (mix of categorical choices and 0-10 sliders), Step 2 adaptive follow-ups triggered by symptom severity/trends, and Step 3 AI-generated advice JSON.
