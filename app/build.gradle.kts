@@ -20,8 +20,25 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
+    signingConfigs {
+        create("release") {
+            // CI环境使用环境变量
+            storeFile = if (System.getenv("KEYSTORE_FILE") != null) {
+                // GitHub Actions会将base64解码后的keystore写入这个路径
+                file("${rootProject.buildDir}/release.keystore")
+            } else {
+                // 本地开发使用本地keystore
+                file("keystore.jks")
+            }
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "heldairy2024"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "heldairy"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "heldairy2024"
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

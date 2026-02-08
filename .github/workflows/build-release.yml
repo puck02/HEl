@@ -36,12 +36,29 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
       
+      - name: Decode Keystore
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          echo "${{ secrets.KEYSTORE_FILE }}" | base64 --decode > ${{ github.workspace }}/app/keystore.jks
+          echo "✅ Keystore decoded successfully"
+      
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
       
-      - name: Build Release APK
+      - name: Build Release APK (Signed)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease --stacktrace
+          echo "✅ Signed Release APK built successfully"
+      
+      - name: Build Release APK (Unsigned fallback)
+        if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
         run: ./gradlew assembleRelease --stacktrace
-        continue-on-error: true  # Release签名可能未配置，允许失败
+        continue-on-error: true
       
       - name: Rename APKs
         run: |

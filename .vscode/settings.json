@@ -1,0 +1,10 @@
+{
+    "chat.agent.maxRequests": 250,
+    "chat.mcp.discovery.enabled": {
+        "claude-desktop": true,
+        "windsurf": true,
+        "cursor-global": true,
+        "cursor-workspace": true
+    },
+    "chat.mcp.gallery.enabled": true
+}
