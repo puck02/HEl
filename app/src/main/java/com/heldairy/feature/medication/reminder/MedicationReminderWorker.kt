@@ -115,7 +115,7 @@ class MedicationReminderWorker(
 
             // Build notification with full-screen intent for heads-up display
             val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)  // 使用系统图标确保显示
+                .setSmallIcon(R.drawable.strawberry)  // Hello Kitty草莓图标
                 .setContentTitle(title)
                 .setContentText(message)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(message))
