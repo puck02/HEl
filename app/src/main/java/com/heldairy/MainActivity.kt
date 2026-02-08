@@ -104,6 +104,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.app.Activity
+import android.content.Context
 import android.os.Build
 import com.heldairy.feature.home.HomeDashboardUiState
 import com.heldairy.feature.home.HomeDashboardViewModel
@@ -151,7 +152,80 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        setContent { HElDairyApp() }
+
+        // 在 App 启动时预创建所有通知渠道（即使用户尚未授权，渠道也需要先注册）
+        createNotificationChannels()
+
+        setContent {
+            // 在 Compose 中请求通知权限（Android 13+）
+            RequestNotificationPermission()
+            HElDairyApp()
+        }
+    }
+
+    /**
+     * 预创建所有通知渠道。
+     * 即使权限未授予，渠道也会注册到系统中，
+     * 用户可在系统设置中手动开启。
+     */
+    private fun createNotificationChannels() {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+
+        // 用药提醒渠道
+        val medicationChannel = android.app.NotificationChannel(
+            "medication_reminder_channel",
+            "用药提醒",
+            android.app.NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "提醒您按时用药"
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 500, 200, 500)
+            setShowBadge(true)
+            enableLights(true)
+        }
+
+        // 日报提醒渠道
+        val dailyChannel = android.app.NotificationChannel(
+            "daily_report_reminder",
+            "日报提醒",
+            android.app.NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "每日20:00提醒填写健康日报"
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 300, 150, 300, 150, 300)
+            setShowBadge(true)
+            enableLights(true)
+            lightColor = 0xFFFFB7C5.toInt()
+        }
+
+        notificationManager.createNotificationChannels(listOf(medicationChannel, dailyChannel))
+    }
+}
+
+/**
+ * 在 Compose 层请求 POST_NOTIFICATIONS 权限。
+ * Android 13+ (API 33) 必须运行时授权，否则所有通知静默丢弃。
+ */
+@Composable
+private fun RequestNotificationPermission() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val context = LocalContext.current
+        val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            android.util.Log.d("NotificationPermission",
+                if (granted) "✅ 通知权限已授予" else "❌ 通知权限被拒绝")
+        }
+
+        LaunchedEffect(Unit) {
+            val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+            if (!hasPermission) {
+                permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
     }
 }
 

@@ -232,7 +232,7 @@
     <string name="cd_page_description">Page %1$d</string>
 
     <!-- Insights Screen -->
-    <string name="insights_ai_advice">AI Insights</string>
+    <string name="insights_ai_advice">Insights</string>
     <string name="insights_error_loading">Failed to load</string>
     <string name="insights_empty_title">No Data</string>
     <string name="insights_empty_message">After completing daily reports, your habit patterns and trends will appear here.</string>

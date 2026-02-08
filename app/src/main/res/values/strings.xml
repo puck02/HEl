@@ -232,7 +232,7 @@
     <string name="cd_page_description">第 %1$d 页</string>
 
     <!-- Insights Screen -->
-    <string name="insights_ai_advice">AI 洞察建议</string>
+    <string name="insights_ai_advice">洞察建议</string>
     <string name="insights_error_loading">加载失败</string>
     <string name="insights_empty_title">暂无数据</string>
     <string name="insights_empty_message">完成每日填报后，这里会出现你的习惯分布和趋势。</string>
