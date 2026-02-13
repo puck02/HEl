@@ -62,8 +62,10 @@ class HomeDashboardViewModel(
             hasTodayEntry = true,
             steps = responses["daily_steps"]?.let { mapSteps(it, last7Days, weeklyResponsesMap) },
             sleep = responses["sleep_duration"]?.let { mapSleep(it, last7Days, weeklyResponsesMap) },
-            mood = responses["mood_irritability"]?.let { mapMood(it, last7Days, weeklyResponsesMap) },
-            energy = responses["overall_feeling"]?.let { mapEnergy(it, last7Days, weeklyResponsesMap) }
+            // 修复：今日心情从 overall_feeling 获取（很好/还行/不舒服/难受）
+            mood = responses["overall_feeling"]?.let { mapMood(it, last7Days, weeklyResponsesMap) },
+            // 修复：身体能量综合睡眠和运动计算
+            energy = calculateEnergyScore(responses, last7Days, weeklyResponsesMap)
         )
     }
 
@@ -118,42 +120,22 @@ class HomeDashboardViewModel(
     }
 
     private fun mapMood(response: QuestionResponseEntity, last7Days: List<String>, weeklyData: Map<String, Map<String, QuestionResponseEntity>>): MetricDisplay {
-        val score = response.answerValue.toIntOrNull()
-        val value = score?.let { "$it / 10" } ?: response.answerLabel.ifBlank { response.answerValue }
-        val hint = when {
-            score == null -> null
-            score <= 3 -> "平稳"
-            score <= 6 -> "略烦躁"
-            else -> "明显紧绷"
-        }
+        // 从 overall_feeling 获取心情（great/ok/unwell/awful）
+        val moodValue = response.answerValue
+        val displayValue = response.answerLabel.ifBlank { response.answerValue }
         
-        // 获取7天数据（反转：10分最好=1.0，0分最差=0）
-        val weeklyValues = last7Days.map { date ->
-            val scoreValue = weeklyData[date]?.get("mood_irritability")?.answerValue?.toIntOrNull()
-            if (scoreValue != null) {
-                1.0f - (scoreValue / 10f)  // 反转，因为情绪值越低越好
-            } else {
-                0f
-            }
-        }
-        
-        return MetricDisplay(value = value, hint = hint, weeklyData = weeklyValues)
-    }
-
-    private fun mapEnergy(response: QuestionResponseEntity, last7Days: List<String>, weeklyData: Map<String, Map<String, QuestionResponseEntity>>): MetricDisplay {
-        val hint = when (response.answerValue) {
-            "great" -> "充沛"
-            "ok" -> "正常"
-            "unwell" -> "低迷"
-            "awful" -> "需要休息"
+        val hint = when (moodValue) {
+            "great" -> "心情很好"
+            "ok" -> "还不错"
+            "unwell" -> "有点低落"
+            "awful" -> "需要关怀"
             else -> null
         }
-        val value = response.answerLabel.ifBlank { response.answerValue }
         
-        // 获取7天数据
+        // 获取7天数据（great=1.0最好，awful=0.15最差）
         val weeklyValues = last7Days.map { date ->
-            val energyValue = weeklyData[date]?.get("overall_feeling")?.answerValue
-            when (energyValue) {
+            val feelingValue = weeklyData[date]?.get("overall_feeling")?.answerValue
+            when (feelingValue) {
                 "great" -> 1.0f
                 "ok" -> 0.7f
                 "unwell" -> 0.4f
@@ -162,7 +144,84 @@ class HomeDashboardViewModel(
             }
         }
         
-        return MetricDisplay(value = value, hint = hint, weeklyData = weeklyValues)
+        return MetricDisplay(value = displayValue, hint = hint, weeklyData = weeklyValues)
+    }
+
+    /**
+     * 综合计算身体能量分数
+     * 基于睡眠质量（60%）+ 运动量（40%）
+     */
+    private fun calculateEnergyScore(
+        responses: Map<String, QuestionResponseEntity>,
+        last7Days: List<String>,
+        weeklyData: Map<String, Map<String, QuestionResponseEntity>>
+    ): MetricDisplay? {
+        val sleepResponse = responses["sleep_duration"] ?: return null
+        val stepsResponse = responses["daily_steps"]
+        
+        // 计算睡眠得分 (0-100)
+        val sleepScore = when (sleepResponse.answerValue) {
+            "gt8" -> 100
+            "7_8" -> 95
+            "6_7" -> 70
+            "lt6" -> 40
+            else -> 50
+        }
+        
+        // 计算运动得分 (0-100)
+        val stepsScore = when (stepsResponse?.answerValue) {
+            "gt10k" -> 100
+            "6_10k" -> 80
+            "3_6k" -> 60
+            "lt3k" -> 30
+            null -> 50  // 无运动数据时给中等分
+            else -> 50
+        }
+        
+        // 综合能量分数（睡眠60% + 运动40%）
+        val totalScore = (sleepScore * 0.6 + stepsScore * 0.4).toInt()
+        
+        val hint = when {
+            totalScore >= 90 -> "精力充沛"
+            totalScore >= 75 -> "状态良好"
+            totalScore >= 60 -> "略感疲惫"
+            totalScore >= 45 -> "需要休息"
+            else -> "严重不足"
+        }
+        
+        // 获取7天数据（能量趋势）
+        val weeklyValues = last7Days.map { date ->
+            val sleepVal = weeklyData[date]?.get("sleep_duration")?.answerValue
+            val stepsVal = weeklyData[date]?.get("daily_steps")?.answerValue
+            
+            val daySleepScore = when (sleepVal) {
+                "gt8" -> 100
+                "7_8" -> 95
+                "6_7" -> 70
+                "lt6" -> 40
+                else -> 0
+            }
+            
+            val dayStepsScore = when (stepsVal) {
+                "gt10k" -> 100
+                "6_10k" -> 80
+                "3_6k" -> 60
+                "lt3k" -> 30
+                else -> 0
+            }
+            
+            if (daySleepScore == 0 && dayStepsScore == 0) {
+                0f
+            } else {
+                ((daySleepScore * 0.6 + dayStepsScore * 0.4) / 100).toFloat()
+            }
+        }
+        
+        return MetricDisplay(
+            value = "$totalScore 分",
+            hint = hint,
+            weeklyData = weeklyValues
+        )
     }
 
     companion object {

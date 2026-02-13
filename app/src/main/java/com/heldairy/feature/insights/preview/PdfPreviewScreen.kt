@@ -298,61 +298,65 @@ private fun PdfPreviewBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.M),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.S)
+                .padding(horizontal = Spacing.S, vertical = Spacing.XS),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.XS),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 重新生成按钮
-            OutlinedButton(
+            // 重新生成按钮 - 紧凑图标按钮
+            OutlinedIconButton(
                 onClick = onRegenerate,
                 enabled = !isSaving,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.size(40.dp)
             ) {
                 Icon(
                     Icons.Outlined.Refresh,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.pdf_preview_regenerate),
                     modifier = Modifier.size(18.dp)
                 )
-                Spacer(Modifier.width(4.dp))
-                Text(stringResource(R.string.pdf_preview_regenerate))
             }
 
-            // 分享按钮
-            OutlinedButton(
+            // 分享按钮 - 紧凑图标按钮
+            OutlinedIconButton(
                 onClick = onShare,
                 enabled = !isSaving,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.size(40.dp)
             ) {
                 Icon(
                     Icons.Filled.Share,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.pdf_preview_share),
                     modifier = Modifier.size(18.dp)
                 )
-                Spacer(Modifier.width(4.dp))
-                Text(stringResource(R.string.pdf_preview_share))
             }
 
-            // 保存PDF按钮
+            // 保存PDF按钮 - 占剩余宽度
             Button(
                 onClick = onSave,
                 enabled = !isSaving,
-                modifier = Modifier.weight(1.5f)
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 if (isSaving) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp,
                         color = MaterialTheme.colorScheme.onPrimary
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.pdf_preview_saving))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        stringResource(R.string.pdf_preview_saving),
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 } else {
                     Icon(
                         Icons.Outlined.Download,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
-                    Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.pdf_preview_save))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        stringResource(R.string.pdf_preview_save),
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
             }
         }
@@ -375,7 +379,7 @@ private suspend fun loadPdfPages(pdfFile: File): List<Bitmap> = withContext(Disp
             val page = renderer.openPage(pageIndex)
             
             // 计算合适的渲染尺寸（保持A4比例，宽度适配屏幕）
-            val renderWidth = 1200 // 高质量渲染
+            val renderWidth = 2400 // 高质量渲染（提升清晰度）
             val renderHeight = (page.height.toFloat() / page.width.toFloat() * renderWidth).toInt()
             
             val bitmap = Bitmap.createBitmap(
