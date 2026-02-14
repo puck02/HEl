@@ -314,6 +314,16 @@ private class FakeDailyReportDao : DailyReportDao {
         refreshLatest()
     }
 
+    override suspend fun deleteInsightsBefore(beforeDate: String): Int {
+        val before = insights.count { it.weekStartDate < beforeDate }
+        insights.removeAll { it.weekStartDate < beforeDate }
+        return before
+    }
+
+    override fun loadSnapshotsPaged(): androidx.paging.PagingSource<Int, DailyEntrySnapshot> {
+        throw UnsupportedOperationException("Not used in tests")
+    }
+
     // Phase 2: Advice Tracking methods
     override suspend fun insertAdviceTracking(tracking: AdviceTrackingEntity): Long = 0L
     override suspend fun insertAdviceTrackings(trackings: List<AdviceTrackingEntity>) {}

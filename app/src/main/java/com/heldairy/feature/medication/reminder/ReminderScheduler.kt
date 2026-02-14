@@ -1,6 +1,10 @@
 package com.heldairy.feature.medication.reminder
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.os.Build
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -11,12 +15,15 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 object ReminderScheduler {
 
+    private const val ALARM_REQUEST_CODE_BASE = 20000
+
     /**
-     * Schedule a reminder
+     * Schedule a reminder using both AlarmManager (precise) and WorkManager (fallback)
      */
     fun scheduleReminder(context: Context, reminder: MedicationReminder) {
         if (!reminder.enabled) {
@@ -28,7 +35,6 @@ object ReminderScheduler {
         val delay = calculateNextDelay(reminder)
         if (delay == null) {
             android.util.Log.w("ReminderScheduler", "No valid next time for reminder: ${reminder.id}")
-            // Reminder has expired or no valid next time
             cancelReminder(context, reminder.id)
             return
         }
@@ -36,6 +42,32 @@ object ReminderScheduler {
         val delayMinutes = delay.toMinutes()
         android.util.Log.d("ReminderScheduler", "Scheduling reminder ${reminder.id} in $delayMinutes minutes (${reminder.hour}:${reminder.minute})")
 
+        // Channel 1: AlarmManager — precise, survives process death
+        scheduleWithAlarmManager(context, reminder, delay)
+
+        // Channel 2: WorkManager — fallback
+        scheduleWithWorkManager(context, reminder, delay)
+
+        android.util.Log.d("ReminderScheduler", "Reminder scheduled (dual-channel): ${reminder.id}")
+    }
+
+    private fun scheduleWithAlarmManager(context: Context, reminder: MedicationReminder, delay: Duration) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val triggerAtMillis = System.currentTimeMillis() + delay.toMillis()
+        val pendingIntent = createAlarmPendingIntent(context, reminder.id)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (alarmManager.canScheduleExactAlarms()) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            } else {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            }
+        } else {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+        }
+    }
+
+    private fun scheduleWithWorkManager(context: Context, reminder: MedicationReminder, delay: Duration) {
         val workRequest = OneTimeWorkRequestBuilder<MedicationReminderWorker>()
             .setInitialDelay(delay.toMillis(), TimeUnit.MILLISECONDS)
             .setInputData(
@@ -51,8 +83,6 @@ object ReminderScheduler {
             ExistingWorkPolicy.REPLACE,
             workRequest
         )
-        
-        android.util.Log.d("ReminderScheduler", "Reminder scheduled successfully: ${reminder.id}")
     }
 
     /**
@@ -60,16 +90,9 @@ object ReminderScheduler {
      */
     fun scheduleNextReminder(context: Context, reminder: MedicationReminder) {
         when (reminder.repeatType) {
-            RepeatType.DAILY -> {
-                // Daily repeats, schedule for next day
-                scheduleReminder(context, reminder)
-            }
-            RepeatType.WEEKLY -> {
-                // Weekly repeats on specific days
-                scheduleReminder(context, reminder)
-            }
+            RepeatType.DAILY -> scheduleReminder(context, reminder)
+            RepeatType.WEEKLY -> scheduleReminder(context, reminder)
             RepeatType.DATE_RANGE -> {
-                // Check if still within range
                 val now = LocalDate.now()
                 if (reminder.endDate?.isAfter(now) == true) {
                     scheduleReminder(context, reminder)
@@ -81,10 +104,25 @@ object ReminderScheduler {
     }
 
     /**
-     * Cancel a scheduled reminder
+     * Cancel a scheduled reminder (both AlarmManager and WorkManager)
      */
     fun cancelReminder(context: Context, reminderId: Long) {
         WorkManager.getInstance(context).cancelUniqueWork(getWorkName(reminderId))
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.cancel(createAlarmPendingIntent(context, reminderId))
+    }
+
+    private fun createAlarmPendingIntent(context: Context, reminderId: Long): PendingIntent {
+        val intent = Intent(context, MedicationReminderReceiver::class.java).apply {
+            action = MedicationReminderReceiver.ACTION_MEDICATION_ALARM
+            putExtra(MedicationReminderReceiver.EXTRA_REMINDER_ID, reminderId)
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            ALARM_REQUEST_CODE_BASE + reminderId.toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     /**

@@ -286,16 +286,16 @@ fun InsightsScreen(
 			),
 			verticalArrangement = Arrangement.spacedBy(Spacing.M)
 		) {
-			item {
+			item(key = "weekly_insight", contentType = "weekly") {
 				WeeklyInsightCard(
 					weekly = state.weeklyInsight,
 					onOpen = { showWeeklyExpanded = true }
 				)
 			}
-			item { WindowSelector(selected = state.selectedWindow, onSelectWindow = onSelectWindow) }
+			item(key = "window_selector", contentType = "selector") { WindowSelector(selected = state.selectedWindow, onSelectWindow = onSelectWindow) }
 			
 			// 医生报表生成卡片
-			item { 
+			item(key = "doctor_report", contentType = "doctor_report") { 
 				DoctorReportCard(
 					isGenerating = state.isGeneratingPreview,
 					errorMessage = state.previewError,
@@ -308,16 +308,16 @@ fun InsightsScreen(
 			}
 
 			if (state.isLoading) {
-				item { LoadingCard() }
+				item(key = "loading") { LoadingCard() }
 			}
 
 			state.error?.let { error ->
-				item { ErrorCard(message = error) }
+				item(key = "error") { ErrorCard(message = error) }
 			}
 
 			selectedWindow?.let { window ->
-				item { CompletionCard(window) }
-				item { InsightGrid(window) }
+				item(key = "completion", contentType = "chart") { CompletionCard(window) }
+				item(key = "insight_grid", contentType = "chart") { InsightGrid(window) }
 				if (window.symptomMetrics.isNotEmpty()) {
 					item { SymptomCard(metrics = window.symptomMetrics) }
 				}

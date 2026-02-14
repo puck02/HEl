@@ -162,10 +162,10 @@ fun DailyReportScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.M)
     ) {
-        item { DailyHeader(carePrompt = carePrompt) }
+        item(key = "header", contentType = "header") { DailyHeader(carePrompt = carePrompt) }
         
         // Time suggestion hint
-        item {
+        item(key = "time_hint", contentType = "hint") {
             Text(
                 text = stringResource(R.string.report_time_suggestion),
                 style = MaterialTheme.typography.bodySmall,
@@ -176,7 +176,7 @@ fun DailyReportScreen(
         }
         
         if (state.isTimeRestricted) {
-            item {
+            item(key = "time_restriction", contentType = "restriction") {
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer
@@ -213,7 +213,8 @@ fun DailyReportScreen(
         
         itemsIndexed(
             items = state.questions.filter { it.isVisible },
-            key = { _, item -> item.question.id }
+            key = { _, item -> item.question.id },
+            contentType = { _, _ -> "question" }
         ) { index, questionState ->
             QuestionCard(
                 position = index + 1,
@@ -225,7 +226,7 @@ fun DailyReportScreen(
                 isEnabled = !state.isTimeRestricted
             )
         }
-        item {
+        item(key = "submit", contentType = "submit") {
             SubmitBar(
                 canSubmit = state.canSubmit && !state.isTimeRestricted,
                 isSaving = state.isSaving,
@@ -233,7 +234,7 @@ fun DailyReportScreen(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        item {
+        item(key = "advice", contentType = "advice") {
             AdviceSection(
                 adviceState = adviceState,
                 onRetry = onAdviceRetry,
@@ -243,7 +244,7 @@ fun DailyReportScreen(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        item { Spacer(modifier = Modifier.height(Spacing.M)) }
+        item(key = "spacer") { Spacer(modifier = Modifier.height(Spacing.M)) }
     }
 }
 

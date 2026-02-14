@@ -238,6 +238,7 @@ class HomeDashboardViewModel(
     }
 }
 
+@androidx.compose.runtime.Immutable
 data class HomeDashboardUiState(
     val hasTodayEntry: Boolean = false,
     val steps: MetricDisplay? = null,
@@ -248,6 +249,7 @@ data class HomeDashboardUiState(
     val avatarUri: String? = null
 )
 
+@androidx.compose.runtime.Immutable
 data class MetricDisplay(
     val value: String,
     val hint: String?,

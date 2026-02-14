@@ -65,6 +65,7 @@ class DailyReportViewModel(
     private val aiFollowUps = MutableStateFlow<List<DailyQuestion>>(emptyList())
     private var aiFollowUpRequested = false
     private var latestSettings: AiSettings = AiSettings(apiKey = "", aiEnabled = true, themeDark = false)
+    private var adviceJob: kotlinx.coroutines.Job? = null
 
     private val _uiState = MutableStateFlow(DailyReportUiState())
     val uiState: StateFlow<DailyReportUiState> = _uiState.asStateFlow()
@@ -345,7 +346,8 @@ class DailyReportViewModel(
             }
             return
         }
-        viewModelScope.launch {
+        adviceJob?.cancel()
+        adviceJob = viewModelScope.launch {
             _adviceState.update { it.copy(isGenerating = true, errorMessage = null) }
             val result = adviceCoordinator.generateAdviceForEntry(entryId)
             if (result.isSuccess) {
@@ -665,6 +667,7 @@ data class StepProgress(
     val isComplete: Boolean
 )
 
+@androidx.compose.runtime.Immutable
 data class DailyReportUiState(
     val questions: List<QuestionUiState> = emptyList(),
     val stepProgress: List<StepProgress> = emptyList(),
@@ -674,6 +677,7 @@ data class DailyReportUiState(
     val restrictionMessage: String = ""
 )
 
+@androidx.compose.runtime.Immutable
 data class AdviceUiState(
     val entryId: Long? = null,
     val entryDate: String? = null,
