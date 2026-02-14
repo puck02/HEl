@@ -5,235 +5,168 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
+import android.util.Log
 import com.heldairy.feature.medication.MedicationReminder
 import com.heldairy.feature.medication.RepeatType
-import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
-import java.util.concurrent.TimeUnit
 
+/**
+ * 用药提醒调度器
+ * 
+ * 使用 AlarmManager.setAlarmClock() 实现系统级精确提醒。
+ * 即使应用被杀、设备 Doze 模式下也能准时触发。
+ */
 object ReminderScheduler {
 
+    private const val TAG = "ReminderScheduler"
     private const val ALARM_REQUEST_CODE_BASE = 20000
 
     /**
-     * Schedule a reminder using both AlarmManager (precise) and WorkManager (fallback)
+     * 调度一个提醒
      */
     fun scheduleReminder(context: Context, reminder: MedicationReminder) {
         if (!reminder.enabled) {
-            android.util.Log.d("ReminderScheduler", "Reminder disabled, cancelling: ${reminder.id}")
+            Log.d(TAG, "提醒已禁用，取消调度: ${reminder.id}")
             cancelReminder(context, reminder.id)
             return
         }
 
-        val delay = calculateNextDelay(reminder)
-        if (delay == null) {
-            android.util.Log.w("ReminderScheduler", "No valid next time for reminder: ${reminder.id}")
-            cancelReminder(context, reminder.id)
+        val nextTrigger = calculateNextTrigger(reminder) ?: run {
+            Log.d(TAG, "无下次触发时间: ${reminder.id}")
             return
         }
 
-        val delayMinutes = delay.toMinutes()
-        android.util.Log.d("ReminderScheduler", "Scheduling reminder ${reminder.id} in $delayMinutes minutes (${reminder.hour}:${reminder.minute})")
-
-        // Channel 1: AlarmManager — precise, survives process death
-        scheduleWithAlarmManager(context, reminder, delay)
-
-        // Channel 2: WorkManager — fallback
-        scheduleWithWorkManager(context, reminder, delay)
-
-        android.util.Log.d("ReminderScheduler", "Reminder scheduled (dual-channel): ${reminder.id}")
-    }
-
-    private fun scheduleWithAlarmManager(context: Context, reminder: MedicationReminder, delay: Duration) {
+        val triggerMillis = nextTrigger.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val triggerAtMillis = System.currentTimeMillis() + delay.toMillis()
-        val pendingIntent = createAlarmPendingIntent(context, reminder.id)
+        val pendingIntent = createPendingIntent(context, reminder.id)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-            } else {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+        // 使用 AlarmClock —— 最高优先级，不受 Doze 限制
+        try {
+            val showIntent = createShowPendingIntent(context)
+            val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerMillis, showIntent)
+            alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+            Log.i(TAG, "✅ 用药提醒已调度 (AlarmClock): id=${reminder.id}, trigger=$nextTrigger")
+        } catch (e: SecurityException) {
+            Log.w(TAG, "AlarmClock 失败，降级到 setExactAndAllowWhileIdle", e)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMillis, pendingIntent)
+                } else {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMillis, pendingIntent)
+                }
+            } catch (e2: Exception) {
+                Log.e(TAG, "所有闹钟调度方式均失败", e2)
             }
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
         }
-    }
-
-    private fun scheduleWithWorkManager(context: Context, reminder: MedicationReminder, delay: Duration) {
-        val workRequest = OneTimeWorkRequestBuilder<MedicationReminderWorker>()
-            .setInitialDelay(delay.toMillis(), TimeUnit.MILLISECONDS)
-            .setInputData(
-                Data.Builder()
-                    .putLong(MedicationReminderWorker.KEY_REMINDER_ID, reminder.id)
-                    .build()
-            )
-            .addTag(getWorkTag(reminder.id))
-            .build()
-
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            getWorkName(reminder.id),
-            ExistingWorkPolicy.REPLACE,
-            workRequest
-        )
     }
 
     /**
-     * Schedule next occurrence after current reminder fires
+     * 调度下一次提醒（在 Receiver 触发后调用）
      */
     fun scheduleNextReminder(context: Context, reminder: MedicationReminder) {
-        when (reminder.repeatType) {
-            RepeatType.DAILY -> scheduleReminder(context, reminder)
-            RepeatType.WEEKLY -> scheduleReminder(context, reminder)
+        scheduleReminder(context, reminder)
+    }
+
+    /**
+     * 取消一个提醒
+     */
+    fun cancelReminder(context: Context, reminderId: Long) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pendingIntent = createPendingIntent(context, reminderId)
+        alarmManager.cancel(pendingIntent)
+        pendingIntent.cancel()
+        Log.i(TAG, "用药提醒已取消: $reminderId")
+    }
+
+    /**
+     * 重新调度所有已启用的提醒（开机后/应用更新后调用）
+     */
+    fun rescheduleAllReminders(context: Context, reminders: List<MedicationReminder>) {
+        Log.i(TAG, "重新调度 ${reminders.size} 个提醒")
+        reminders.forEach { reminder ->
+            if (reminder.enabled) {
+                scheduleReminder(context, reminder)
+            }
+        }
+    }
+
+    /**
+     * 计算下次触发时间
+     */
+    private fun calculateNextTrigger(reminder: MedicationReminder): LocalDateTime? {
+        val now = LocalDateTime.now()
+        val reminderTime = LocalTime.of(reminder.hour, reminder.minute)
+
+        return when (reminder.repeatType) {
+            RepeatType.DAILY -> {
+                val todayTrigger = now.toLocalDate().atTime(reminderTime)
+                if (now < todayTrigger) todayTrigger else todayTrigger.plusDays(1)
+            }
+
+            RepeatType.WEEKLY -> {
+                val weekDays = reminder.weekDays
+                if (weekDays.isNullOrEmpty()) return null
+
+                // 找到最近的下一个触发日
+                for (daysAhead in 0..7) {
+                    val candidate = now.toLocalDate().plusDays(daysAhead.toLong())
+                    val dayOfWeek = candidate.dayOfWeek.value // 1=Monday ... 7=Sunday
+                    if (dayOfWeek in weekDays) {
+                        val candidateTime = candidate.atTime(reminderTime)
+                        if (candidateTime > now) return candidateTime
+                    }
+                }
+                null
+            }
+
             RepeatType.DATE_RANGE -> {
-                val now = LocalDate.now()
-                if (reminder.endDate?.isAfter(now) == true) {
-                    scheduleReminder(context, reminder)
+                val startDate = reminder.startDate ?: return null
+                val endDate = reminder.endDate
+                val today = now.toLocalDate()
+
+                if (today < startDate) {
+                    return startDate.atTime(reminderTime)
+                }
+                if (endDate != null && today > endDate) {
+                    return null // 已过期
+                }
+
+                val todayTrigger = today.atTime(reminderTime)
+                if (now < todayTrigger) {
+                    todayTrigger
                 } else {
-                    cancelReminder(context, reminder.id)
+                    val tomorrow = today.plusDays(1)
+                    if (endDate != null && tomorrow > endDate) null
+                    else tomorrow.atTime(reminderTime)
                 }
             }
         }
     }
 
-    /**
-     * Cancel a scheduled reminder (both AlarmManager and WorkManager)
-     */
-    fun cancelReminder(context: Context, reminderId: Long) {
-        WorkManager.getInstance(context).cancelUniqueWork(getWorkName(reminderId))
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        alarmManager.cancel(createAlarmPendingIntent(context, reminderId))
-    }
-
-    private fun createAlarmPendingIntent(context: Context, reminderId: Long): PendingIntent {
+    private fun createPendingIntent(context: Context, reminderId: Long): PendingIntent {
         val intent = Intent(context, MedicationReminderReceiver::class.java).apply {
             action = MedicationReminderReceiver.ACTION_MEDICATION_ALARM
             putExtra(MedicationReminderReceiver.EXTRA_REMINDER_ID, reminderId)
         }
         return PendingIntent.getBroadcast(
             context,
-            ALARM_REQUEST_CODE_BASE + reminderId.toInt(),
+            (ALARM_REQUEST_CODE_BASE + reminderId).toInt(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
 
-    /**
-     * Reschedule all enabled reminders (call on app startup)
-     */
-    suspend fun rescheduleAllReminders(context: Context, reminders: List<MedicationReminder>) {
-        reminders.forEach { reminder ->
-            if (reminder.enabled) {
-                scheduleReminder(context, reminder)
-            } else {
-                cancelReminder(context, reminder.id)
-            }
-        }
-    }
-
-    /**
-     * Calculate delay until next reminder time
-     */
-    private fun calculateNextDelay(reminder: MedicationReminder): Duration? {
-        val now = LocalDateTime.now()
-        val reminderTime = LocalTime.of(reminder.hour, reminder.minute)
-
-        return when (reminder.repeatType) {
-            RepeatType.DAILY -> {
-                calculateDailyDelay(now, reminderTime)
-            }
-            RepeatType.WEEKLY -> {
-                calculateWeeklyDelay(now, reminderTime, reminder.weekDays ?: emptyList())
-            }
-            RepeatType.DATE_RANGE -> {
-                calculateDateRangeDelay(
-                    now,
-                    reminderTime,
-                    reminder.startDate,
-                    reminder.endDate
-                )
-            }
-        }
-    }
-
-    private fun calculateDailyDelay(now: LocalDateTime, reminderTime: LocalTime): Duration {
-        var nextReminder = now.toLocalDate().atTime(reminderTime)
-        if (nextReminder.isBefore(now) || nextReminder.isEqual(now)) {
-            // If time has passed today, schedule for tomorrow
-            nextReminder = nextReminder.plusDays(1)
-        }
-        return Duration.between(now, nextReminder)
-    }
-
-    private fun calculateWeeklyDelay(
-        now: LocalDateTime,
-        reminderTime: LocalTime,
-        weekDays: List<Int>
-    ): Duration? {
-        if (weekDays.isEmpty()) return null
-
-        val currentDayOfWeek = now.dayOfWeek.value // 1=Monday, 7=Sunday
-        var nextReminder: LocalDateTime? = null
-
-        // Check today first
-        if (weekDays.contains(currentDayOfWeek)) {
-            val todayReminder = now.toLocalDate().atTime(reminderTime)
-            if (todayReminder.isAfter(now)) {
-                nextReminder = todayReminder
-            }
-        }
-
-        // If not today or time passed, find next day in the week
-        if (nextReminder == null) {
-            for (daysAhead in 1..7) {
-                val checkDate = now.toLocalDate().plusDays(daysAhead.toLong())
-                val checkDayOfWeek = checkDate.dayOfWeek.value
-                if (weekDays.contains(checkDayOfWeek)) {
-                    nextReminder = checkDate.atTime(reminderTime)
-                    break
-                }
-            }
-        }
-
-        return nextReminder?.let { Duration.between(now, it) }
-    }
-
-    private fun calculateDateRangeDelay(
-        now: LocalDateTime,
-        reminderTime: LocalTime,
-        startDate: LocalDate?,
-        endDate: LocalDate?
-    ): Duration? {
-        if (startDate == null || endDate == null) return null
-
-        val today = now.toLocalDate()
-        
-        // Check if we're within the date range
-        if (today.isBefore(startDate) || today.isAfter(endDate)) {
-            return null
-        }
-
-        // If today is before start date, schedule for start date
-        return if (today.isBefore(startDate)) {
-            Duration.between(now, startDate.atTime(reminderTime))
-        } else {
-            // Within range, use daily calculation
-            calculateDailyDelay(now, reminderTime)
-        }
-    }
-
-    private fun getWorkName(reminderId: Long): String {
-        return "medication_reminder_$reminderId"
-    }
-
-    private fun getWorkTag(reminderId: Long): String {
-        return "reminder_$reminderId"
+    private fun createShowPendingIntent(context: Context): PendingIntent {
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?: Intent()
+        return PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 }

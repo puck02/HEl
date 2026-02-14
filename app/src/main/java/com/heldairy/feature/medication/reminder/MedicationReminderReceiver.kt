@@ -7,19 +7,22 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.os.PowerManager
 import android.provider.Settings
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.heldairy.HElDairyApplication
 import com.heldairy.MainActivity
 import com.heldairy.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * BroadcastReceiver for medication reminders triggered by AlarmManager.
- * Shows notification and re-schedules next alarm.
+ * 用药提醒广播接收器
+ * 
+ * 由 AlarmManager 精确闹钟触发。
+ * 使用 WakeLock + goAsync() 确保在应用关闭状态下也能完整处理。
  */
 class MedicationReminderReceiver : BroadcastReceiver() {
 
@@ -29,7 +32,15 @@ class MedicationReminderReceiver : BroadcastReceiver() {
         val reminderId = intent.getLongExtra(EXTRA_REMINDER_ID, -1L)
         if (reminderId == -1L) return
 
-        android.util.Log.d(TAG, "Medication alarm received for reminder: $reminderId")
+        Log.i(TAG, "💊 用药提醒闹钟触发: reminderId=$reminderId")
+
+        // 获取 WakeLock
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "HElDairy:MedicationReminder:$reminderId"
+        )
+        wakeLock.acquire(30_000L) // 最多持有 30 秒（需要数据库查询）
 
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
@@ -39,17 +50,17 @@ class MedicationReminderReceiver : BroadcastReceiver() {
 
                 val reminder = repository.getReminderById(reminderId)
                 if (reminder == null || !reminder.enabled) {
-                    android.util.Log.d(TAG, "Reminder $reminderId not found or disabled")
+                    Log.d(TAG, "提醒 $reminderId 不存在或已禁用")
                     return@launch
                 }
 
                 val med = repository.getMedById(reminder.medId)
                 if (med == null) {
-                    android.util.Log.d(TAG, "Medication not found for reminder $reminderId")
+                    Log.d(TAG, "药物不存在 for reminder $reminderId")
                     return@launch
                 }
 
-                // Show notification
+                // 发送通知
                 showNotification(
                     context = context,
                     reminderId = reminder.id,
@@ -58,11 +69,16 @@ class MedicationReminderReceiver : BroadcastReceiver() {
                     message = reminder.message ?: "该吃${med.name}了，请按时服用"
                 )
 
-                // Re-schedule next occurrence via AlarmManager
+                // 重新调度下次提醒
                 ReminderScheduler.scheduleReminder(context, reminder)
+                Log.i(TAG, "✅ 用药提醒处理完成: ${med.name}")
+
             } catch (e: Exception) {
-                android.util.Log.e(TAG, "Error handling medication alarm", e)
+                Log.e(TAG, "❌ 用药提醒处理失败", e)
             } finally {
+                if (wakeLock.isHeld) {
+                    wakeLock.release()
+                }
                 pendingResult.finish()
             }
         }

@@ -226,6 +226,9 @@ fun SettingsScreen(
             onChanged = onDailyReminderEnabledChanged
         )
 
+        // 电池优化引导卡片
+        BatteryOptimizationCard()
+
         ApiKeySection(
             apiKeyInput = state.apiKeyInput,
             isApiKeyDirty = state.isApiKeyDirty,
