@@ -5,6 +5,8 @@ import com.heldairy.core.database.entity.DailyAdviceEntity
 import com.heldairy.core.database.entity.DailyEntryWithResponses
 import com.heldairy.core.network.AdvicePayloadFormatException
 import com.heldairy.core.network.DeepSeekClient
+import com.heldairy.core.network.agent.AgentClient
+import com.heldairy.core.network.agent.AgentNotReadyException
 import com.heldairy.core.preferences.AiPreferencesStore
 import java.security.MessageDigest
 import java.time.Clock
@@ -22,6 +24,7 @@ class DailyAdviceCoordinator(
     private val deepSeekClient: DeepSeekClient,
     private val trackingRepository: AdviceTrackingRepository,  // 阶段2
     private val localEngine: LocalAdvisorEngine = LocalAdvisorEngine(),  // 阶段3
+    private val agentClient: AgentClient? = null,  // Agent 优先路径
     private val clock: Clock = Clock.systemDefaultZone(),
     private val json: Json = Json { encodeDefaults = true }
 ) {
@@ -68,7 +71,38 @@ class DailyAdviceCoordinator(
         }
         
         Log.d(TAG, "No local rule matched, escalating to AI analysis")
-        
+
+        // ── Agent 优先路径 ──────────────────────────────
+        if (agentClient != null) {
+            try {
+                val todayAnswers = entry.responses.associate { it.questionId to it.answerValue }
+                val agentPayload = agentClient.fetchAdvice(
+                    todayAnswers = todayAnswers,
+                    summary7d = summary7Days?.let { mapOf("raw" to it.toString()) }
+                )
+                val normalizedAgent = agentPayload.normalized()
+                if (normalizedAgent.validationErrors().isEmpty()) {
+                    Log.d(TAG, "Agent advice received successfully")
+                    saveAdvice(entry, "agent", normalizedAgent)
+                    try {
+                        trackingRepository.saveAdviceAsTrackable(
+                            entryId = entry.entry.id,
+                            entryDate = LocalDate.parse(entry.entry.entryDate),
+                            payload = normalizedAgent
+                        )
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to save agent trackable: ${e.message}")
+                    }
+                    return Result.success(normalizedAgent)
+                }
+                Log.w(TAG, "Agent payload invalid, falling back to DeepSeek")
+            } catch (e: AgentNotReadyException) {
+                Log.d(TAG, "Agent not ready: ${e.message}, falling back to DeepSeek")
+            } catch (e: Exception) {
+                Log.w(TAG, "Agent call failed: ${e.message}, falling back to DeepSeek")
+            }
+        }
+
         // 阶段3: 获取反馈摘要并传给 AI
         val effectivenessSummary = try {
             trackingRepository.generateEffectivenessSummary()

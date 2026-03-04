@@ -6,6 +6,7 @@ import com.heldairy.core.data.AiFollowUpCoordinator
 import com.heldairy.core.data.DailyReportRepository
 import com.heldairy.core.data.DailySummaryManager
 import com.heldairy.core.data.BackupManager
+import com.heldairy.core.data.DataSyncManager
 import com.heldairy.core.data.InsightRepository
 import com.heldairy.core.data.WeeklyInsightCoordinator
 import com.heldairy.core.data.AdviceTrackingRepository
@@ -16,6 +17,10 @@ import com.heldairy.core.network.DeepSeekApi
 import com.heldairy.core.network.DeepSeekClient
 import com.heldairy.core.network.NetworkMonitor
 import com.heldairy.core.network.RetryInterceptor
+import com.heldairy.core.network.agent.AgentApi
+import com.heldairy.core.network.agent.AgentAuthInterceptor
+import com.heldairy.core.network.agent.AgentClient
+import com.heldairy.core.preferences.AgentPreferencesStore
 import com.heldairy.core.preferences.AiPreferencesStore
 import com.heldairy.core.preferences.DailyReportPreferencesStore
 import com.heldairy.core.preferences.UserProfileStore
@@ -50,6 +55,11 @@ interface AppContainer {
     val dailyReportPreferencesStore: DailyReportPreferencesStore
     val networkMonitor: NetworkMonitor
     val securePreferencesStore: SecurePreferencesStore
+
+    // ── Agent (hel-agent) ────────────────────────────────
+    val agentPreferencesStore: AgentPreferencesStore
+    val agentClient: AgentClient?        // null if server URL not configured
+    val dataSyncManager: DataSyncManager?
 }
 
 class AppContainerImpl(context: Context) : AppContainer {
@@ -111,12 +121,14 @@ class AppContainerImpl(context: Context) : AppContainer {
         preferencesStore = aiPreferencesStore,
         deepSeekClient = deepSeekClient,
         trackingRepository = adviceTrackingRepository,
-        localEngine = localEngine
+        localEngine = localEngine,
+        agentClient = agentClient   // Agent 优先路径
     )
 
     override val followUpCoordinator: AiFollowUpCoordinator = AiFollowUpCoordinator(
         preferencesStore = aiPreferencesStore,
-        deepSeekClient = deepSeekClient
+        deepSeekClient = deepSeekClient,
+        agentClient = agentClient   // Agent 优先路径
     )
 
     override val insightRepository: InsightRepository = InsightRepository(
@@ -127,7 +139,8 @@ class AppContainerImpl(context: Context) : AppContainer {
     override val weeklyInsightCoordinator: WeeklyInsightCoordinator = WeeklyInsightCoordinator(
         insightRepository = insightRepository,
         preferencesStore = aiPreferencesStore,
-        deepSeekClient = deepSeekClient
+        deepSeekClient = deepSeekClient,
+        agentClient = agentClient   // Agent 优先路径
     )
 
     override val backupManager: BackupManager = BackupManager(
@@ -145,4 +158,72 @@ class AppContainerImpl(context: Context) : AppContainer {
     )
 
     override val dailyReportPreferencesStore: DailyReportPreferencesStore = DailyReportPreferencesStore(context)
+
+    // ── Agent (hel-agent) 基础设施 ──────────────────────
+
+    override val agentPreferencesStore: AgentPreferencesStore = AgentPreferencesStore(context)
+
+    /**
+     * Agent HTTP 客户端 — 独立于 DeepSeek OkHttpClient。
+     * 内置 JWT 自动注入 + 401 刷新逻辑。
+     * agentApi 通过 lateinit + lazy 解决 Interceptor↔Api 循环依赖。
+     */
+    private lateinit var _agentApi: AgentApi
+
+    private val agentOkHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(Constants.Network.CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(Constants.Network.READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(Constants.Network.WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .callTimeout(Constants.Network.CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .addInterceptor(AgentAuthInterceptor(agentPreferencesStore) { _agentApi })
+            .addInterceptor(RetryInterceptor(maxRetries = Constants.Network.RETRY_MAX_ATTEMPTS, baseDelayMs = Constants.Network.RETRY_BASE_DELAY_MS))
+            .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
+            .build()
+    }
+
+    private fun buildAgentRetrofit(baseUrl: String): Retrofit = Retrofit.Builder()
+        .baseUrl(baseUrl)
+        .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+        .client(agentOkHttpClient)
+        .build()
+
+    /**
+     * AgentApi + AgentClient — 仅在服务器 URL 已配置时创建。
+     * 运行时可通过 [rebuildAgentClient] 重建（用户更改服务器地址后）。
+     */
+    private var _agentClient: AgentClient? = null
+
+    override val agentClient: AgentClient?
+        get() = _agentClient
+
+    override val dataSyncManager: DataSyncManager?
+        get() = _agentClient?.let { client ->
+            DataSyncManager(
+                database = database,
+                agentClient = client,
+                agentPrefs = agentPreferencesStore
+            )
+        }
+
+    /** 当用户配置服务器地址后调用，创建/重建 AgentClient */
+    fun rebuildAgentClient(serverUrl: String) {
+        if (serverUrl.isBlank()) {
+            _agentClient = null
+            return
+        }
+        val agentRetrofit = buildAgentRetrofit(serverUrl.trimEnd('/') + "/")
+        _agentApi = agentRetrofit.create(AgentApi::class.java)
+        _agentClient = AgentClient(_agentApi, networkMonitor, agentPreferencesStore)
+    }
+
+    init {
+        // 尝试用已保存的 URL 初始化 Agent
+        kotlinx.coroutines.runBlocking {
+            val savedUrl = agentPreferencesStore.currentSettings().serverUrl
+            if (savedUrl.isNotBlank()) {
+                rebuildAgentClient(savedUrl)
+            }
+        }
+    }
 }

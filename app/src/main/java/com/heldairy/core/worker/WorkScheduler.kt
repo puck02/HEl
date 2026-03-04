@@ -105,7 +105,41 @@ object WorkScheduler {
         WorkManager.getInstance(context).apply {
             cancelUniqueWork(WeeklyInsightWorker.WORK_NAME)
             cancelUniqueWork(DataCleanupWorker.WORK_NAME)
+            cancelUniqueWork(DataSyncWorker.WORK_NAME)
         }
+    }
+
+    // ─── Agent 数据同步 ────────────────────────────────────────────
+    /**
+     * 调度 Agent 数据同步任务
+     *
+     * 执行时间：每 6 小时
+     * 执行条件：需要网络连接
+     */
+    fun scheduleDataSync(context: Context) {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val workRequest = PeriodicWorkRequestBuilder<DataSyncWorker>(
+            repeatInterval = 6,
+            repeatIntervalTimeUnit = TimeUnit.HOURS
+        )
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            DataSyncWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            workRequest
+        )
+    }
+
+    /**
+     * 取消 Agent 数据同步任务
+     */
+    fun cancelDataSync(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(DataSyncWorker.WORK_NAME)
     }
 
     /**

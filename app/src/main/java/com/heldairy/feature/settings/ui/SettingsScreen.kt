@@ -88,6 +88,12 @@ import java.io.OutputStreamWriter
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.LinearProgressIndicator
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.text.Charsets
@@ -168,6 +174,17 @@ fun SettingsRoute(
                 onExportJson = { exportJsonLauncher.launch(defaultBackupFileName("json")) },
                 onImportJson = { importJsonLauncher.launch("application/json") },
                 onClearAllData = { viewModel.clearAllData() },
+                // Agent
+                onAgentServerUrlChanged = viewModel::onAgentServerUrlChanged,
+                onSaveAgentServerUrl = viewModel::saveAgentServerUrl,
+                onAgentUsernameChanged = viewModel::onAgentUsernameChanged,
+                onAgentPasswordChanged = viewModel::onAgentPasswordChanged,
+                onAgentLogin = viewModel::agentLogin,
+                onAgentRegister = viewModel::agentRegister,
+                onAgentLogout = viewModel::agentLogout,
+                onAgentSyncEnabledChanged = viewModel::onAgentSyncEnabledChanged,
+                onAgentEnabledChanged = viewModel::onAgentEnabledChanged,
+                onTriggerSync = viewModel::triggerSyncNow,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
@@ -191,6 +208,17 @@ fun SettingsScreen(
     onExportJson: () -> Unit,
     onImportJson: () -> Unit,
     onClearAllData: () -> Unit,
+    // Agent
+    onAgentServerUrlChanged: (String) -> Unit = {},
+    onSaveAgentServerUrl: () -> Unit = {},
+    onAgentUsernameChanged: (String) -> Unit = {},
+    onAgentPasswordChanged: (String) -> Unit = {},
+    onAgentLogin: () -> Unit = {},
+    onAgentRegister: () -> Unit = {},
+    onAgentLogout: () -> Unit = {},
+    onAgentSyncEnabledChanged: (Boolean) -> Unit = {},
+    onAgentEnabledChanged: (Boolean) -> Unit = {},
+    onTriggerSync: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -241,6 +269,21 @@ fun SettingsScreen(
         BackupSection(
             onExportJson = onExportJson,
             onImportJson = onImportJson
+        )
+
+        // Agent 智能体配置
+        AgentSection(
+            state = state,
+            onServerUrlChanged = onAgentServerUrlChanged,
+            onSaveServerUrl = onSaveAgentServerUrl,
+            onUsernameChanged = onAgentUsernameChanged,
+            onPasswordChanged = onAgentPasswordChanged,
+            onLogin = onAgentLogin,
+            onRegister = onAgentRegister,
+            onLogout = onAgentLogout,
+            onSyncEnabledChanged = onAgentSyncEnabledChanged,
+            onAgentEnabledChanged = onAgentEnabledChanged,
+            onTriggerSync = onTriggerSync
         )
 
         DataManagementSection(onClearAllData = onClearAllData)
@@ -684,6 +727,187 @@ private fun ProfileCard(
     }
 }
 
+// ─── Agent 智能体配置 Section ───────────────────────────────────────
+@Composable
+private fun AgentSection(
+    state: SettingsUiState,
+    onServerUrlChanged: (String) -> Unit,
+    onSaveServerUrl: () -> Unit,
+    onUsernameChanged: (String) -> Unit,
+    onPasswordChanged: (String) -> Unit,
+    onLogin: () -> Unit,
+    onRegister: () -> Unit,
+    onLogout: () -> Unit,
+    onSyncEnabledChanged: (Boolean) -> Unit,
+    onAgentEnabledChanged: (Boolean) -> Unit,
+    onTriggerSync: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+        ),
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.M),
+            verticalArrangement = Arrangement.spacedBy(Spacing.S)
+        ) {
+            // 标题
+            Text(
+                text = "🤖 智能体 Agent",
+                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            // Agent 总开关
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("启用智能体", style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                Switch(checked = state.agentEnabled, onCheckedChange = onAgentEnabledChanged)
+            }
+
+            if (!state.agentEnabled) return@Column
+
+            // 服务器地址
+            Text("服务器地址", style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.XS),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = state.agentServerUrl,
+                    onValueChange = onServerUrlChanged,
+                    placeholder = { Text("http://your-server:8000") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    textStyle = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                )
+                Button(
+                    onClick = onSaveServerUrl,
+                    contentPadding = PaddingValues(horizontal = Spacing.S)
+                ) {
+                    Text("保存")
+                }
+            }
+
+            // ── 登录状态 ──
+            if (state.agentIsLoggedIn) {
+                // 已登录
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                    ),
+                    shape = RoundedCornerShape(CornerRadius.Small),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(Spacing.S), verticalArrangement = Arrangement.spacedBy(Spacing.XS)) {
+                        Text(
+                            text = "✅ 已登录: ${state.agentLoggedInUsername}",
+                            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        // 数据同步开关
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("自动同步健康数据", style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
+                            Switch(checked = state.agentSyncEnabled, onCheckedChange = onSyncEnabledChanged)
+                        }
+
+                        // 手动同步 + 上次同步时间
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            val lastSync = if (state.agentLastSyncTimestamp > 0L) {
+                                SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+                                    .format(Date(state.agentLastSyncTimestamp))
+                            } else "从未同步"
+                            Text(
+                                text = "上次同步: $lastSync",
+                                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            OutlinedButton(onClick = onTriggerSync, contentPadding = PaddingValues(horizontal = Spacing.S)) {
+                                Text("立即同步")
+                            }
+                        }
+
+                        // 登出按钮
+                        OutlinedButton(
+                            onClick = onLogout,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = androidx.compose.material3.MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("退出登录")
+                        }
+                    }
+                }
+            } else {
+                // 未登录 → 登录 / 注册表单
+                var passwordVisible by remember { mutableStateOf(false) }
+
+                OutlinedTextField(
+                    value = state.agentUsernameInput,
+                    onValueChange = onUsernameChanged,
+                    label = { Text("用户名") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = state.agentPasswordInput,
+                    onValueChange = onPasswordChanged,
+                    label = { Text("密码") },
+                    singleLine = true,
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+                                contentDescription = null
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (state.agentIsLoading) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.S)
+                ) {
+                    Button(
+                        onClick = onLogin,
+                        enabled = !state.agentIsLoading,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("登录") }
+                    OutlinedButton(
+                        onClick = onRegister,
+                        enabled = !state.agentIsLoading,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("注册") }
+                }
+            }
+        }
+    }
+}
+
+// ─── Utility functions ──────────────────────────────────────────────
 private fun defaultBackupFileName(extension: String): String {
     val date = LocalDate.now().toString()
     val suffix = if (extension == "csv") "export" else "backup"

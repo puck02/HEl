@@ -111,4 +111,12 @@ interface MedicationDao {
     
     @Query("DELETE FROM med")
     suspend fun clearAllMeds()
+
+    // ── Sync queries ────────────────────────────────────
+
+    @Query("SELECT * FROM med ORDER BY updatedAt DESC")
+    suspend fun loadAllMedsSuspend(): List<MedEntity>
+
+    @Query("SELECT * FROM med_course ORDER BY startDate DESC")
+    suspend fun loadAllCoursesSuspend(): List<MedCourseEntity>
 }

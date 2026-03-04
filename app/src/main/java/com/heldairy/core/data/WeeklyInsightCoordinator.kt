@@ -2,6 +2,8 @@ package com.heldairy.core.data
 
 import com.heldairy.core.network.AdvicePayloadFormatException
 import com.heldairy.core.network.DeepSeekClient
+import com.heldairy.core.network.agent.AgentClient
+import com.heldairy.core.network.agent.AgentNotReadyException
 import com.heldairy.core.preferences.AiPreferencesStore
 import java.time.Clock
 import java.time.DayOfWeek
@@ -14,6 +16,7 @@ class WeeklyInsightCoordinator(
     private val insightRepository: InsightRepository,
     private val preferencesStore: AiPreferencesStore,
     private val deepSeekClient: DeepSeekClient,
+    private val agentClient: AgentClient? = null,  // Agent 优先路径
     private val clock: Clock = Clock.systemDefaultZone(),
     private val json: Json = Json { ignoreUnknownKeys = true }
 ) {
@@ -95,6 +98,43 @@ class WeeklyInsightCoordinator(
         }
 
         val userPrompt = WeeklyInsightPromptBuilder.buildUserPrompt(weekRange, localSummary)
+
+        // ── Agent 优先路径 ──────────────────────────────
+        if (agentClient != null) {
+            try {
+                val agentPayload = agentClient.fetchWeeklyInsight(
+                    weekStartDate = weekRange.start.toString(),
+                    weekEndDate = weekRange.end.toString(),
+                    summary7d = mapOf("raw" to (localSummary?.window7?.toString() ?: "")),
+                    summary30d = localSummary?.window30?.let { mapOf("raw" to it.toString()) }
+                )
+                val normalizedAgent = agentPayload.normalized()
+                if (normalizedAgent.validationErrors().isEmpty()) {
+                    android.util.Log.d("WeeklyInsightCoord", "Agent insight received successfully")
+                    insightRepository.saveInsightReport(
+                        weekStart = weekRange.start,
+                        weekEnd = weekRange.end,
+                        summary = localSummary,
+                        aiPayload = normalizedAgent,
+                        status = STATUS_SUCCESS
+                    )
+                    return WeeklyInsightResult(
+                        status = WeeklyInsightStatus.Success,
+                        payload = normalizedAgent,
+                        generatedAt = System.currentTimeMillis(),
+                        weekRange = weekRange,
+                        message = null
+                    )
+                }
+                android.util.Log.w("WeeklyInsightCoord", "Agent payload invalid, falling back to DeepSeek")
+            } catch (e: AgentNotReadyException) {
+                android.util.Log.d("WeeklyInsightCoord", "Agent not ready: ${e.message}")
+            } catch (e: Exception) {
+                android.util.Log.w("WeeklyInsightCoord", "Agent call failed: ${e.message}, fallback to DeepSeek")
+            }
+        }
+
+        // ── DeepSeek 回退 ──────────────────────────────
         val payload = try {
             deepSeekClient.fetchWeeklyInsight(
                 apiKey = settings.apiKey,

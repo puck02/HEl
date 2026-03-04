@@ -7,9 +7,13 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
 import com.heldairy.core.data.BackupManager
+import com.heldairy.core.di.AppContainerImpl
+import com.heldairy.core.network.agent.AgentClient
+import com.heldairy.core.preferences.AgentPreferencesStore
 import com.heldairy.core.preferences.AiPreferencesStore
 import com.heldairy.core.preferences.DailyReportPreferencesStore
 import com.heldairy.core.preferences.UserProfileStore
+import com.heldairy.core.worker.DataSyncWorker
 import com.heldairy.feature.report.reminder.DailyReportReminderScheduler
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,13 +25,22 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 
 class SettingsViewModel(
     private val context: Context,
     private val preferencesStore: AiPreferencesStore,
     private val userProfileStore: UserProfileStore,
     private val dailyReportPreferencesStore: DailyReportPreferencesStore,
-    private val backupManager: BackupManager
+    private val backupManager: BackupManager,
+    private val agentPreferencesStore: AgentPreferencesStore,
+    private val appContainerImpl: AppContainerImpl?   // 需要调用 rebuildAgentClient
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -57,6 +70,21 @@ class SettingsViewModel(
         viewModelScope.launch {
             dailyReportPreferencesStore.settingsFlow.collectLatest { settings ->
                 _uiState.update { it.copy(dailyReminderEnabled = settings.reminderEnabled) }
+            }
+        }
+        // ── Agent settings flow ──
+        viewModelScope.launch {
+            agentPreferencesStore.settingsFlow.collectLatest { agentSettings ->
+                _uiState.update {
+                    it.copy(
+                        agentServerUrl = agentSettings.serverUrl,
+                        agentLoggedInUsername = agentSettings.loggedInUsername,
+                        agentIsLoggedIn = agentSettings.isLoggedIn,
+                        agentSyncEnabled = agentSettings.syncEnabled,
+                        agentEnabled = agentSettings.agentEnabled,
+                        agentLastSyncTimestamp = agentSettings.lastSyncTimestamp
+                    )
+                }
             }
         }
     }
@@ -143,16 +171,152 @@ class SettingsViewModel(
         }
     }
 
+    // ═══════════════════════════════════════════════════════
+    // Agent 相关操作
+    // ═══════════════════════════════════════════════════════
+
+    fun onAgentServerUrlChanged(url: String) {
+        _uiState.update { it.copy(agentServerUrl = url) }
+    }
+
+    fun saveAgentServerUrl() {
+        val url = _uiState.value.agentServerUrl
+        viewModelScope.launch {
+            agentPreferencesStore.updateServerUrl(url)
+            appContainerImpl?.rebuildAgentClient(url)
+            _events.emit(SettingsEvent.Snackbar("Agent 服务器地址已保存"))
+        }
+    }
+
+    fun onAgentUsernameChanged(value: String) {
+        _uiState.update { it.copy(agentUsernameInput = value) }
+    }
+
+    fun onAgentPasswordChanged(value: String) {
+        _uiState.update { it.copy(agentPasswordInput = value) }
+    }
+
+    fun agentLogin() {
+        val username = _uiState.value.agentUsernameInput
+        val password = _uiState.value.agentPasswordInput
+        if (username.isBlank() || password.isBlank()) {
+            viewModelScope.launch { _events.emit(SettingsEvent.Snackbar("请输入用户名和密码")) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(agentIsLoading = true) }
+            val client = appContainerImpl?.agentClient
+            if (client == null) {
+                _events.emit(SettingsEvent.Snackbar("请先配置 Agent 服务器地址"))
+                _uiState.update { it.copy(agentIsLoading = false) }
+                return@launch
+            }
+            client.login(username, password)
+                .onSuccess { tokens ->
+                    agentPreferencesStore.saveLoginResult(tokens.accessToken, tokens.refreshToken, username)
+                    _uiState.update { it.copy(agentIsLoading = false, agentPasswordInput = "") }
+                    _events.emit(SettingsEvent.Snackbar("登录成功 🎉"))
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(agentIsLoading = false) }
+                    _events.emit(SettingsEvent.Snackbar("登录失败: ${e.message}"))
+                }
+        }
+    }
+
+    fun agentRegister() {
+        val username = _uiState.value.agentUsernameInput
+        val password = _uiState.value.agentPasswordInput
+        if (username.isBlank() || password.isBlank()) {
+            viewModelScope.launch { _events.emit(SettingsEvent.Snackbar("请输入用户名和密码")) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(agentIsLoading = true) }
+            val client = appContainerImpl?.agentClient
+            if (client == null) {
+                _events.emit(SettingsEvent.Snackbar("请先配置 Agent 服务器地址"))
+                _uiState.update { it.copy(agentIsLoading = false) }
+                return@launch
+            }
+            client.register(username, password, displayName = _uiState.value.userName)
+                .onSuccess { tokens ->
+                    agentPreferencesStore.saveLoginResult(tokens.accessToken, tokens.refreshToken, username)
+                    _uiState.update { it.copy(agentIsLoading = false, agentPasswordInput = "") }
+                    _events.emit(SettingsEvent.Snackbar("注册成功，已自动登录 🎉"))
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(agentIsLoading = false) }
+                    _events.emit(SettingsEvent.Snackbar("注册失败: ${e.message}"))
+                }
+        }
+    }
+
+    fun agentLogout() {
+        viewModelScope.launch {
+            agentPreferencesStore.clearLogin()
+            // 取消同步 Worker
+            WorkManager.getInstance(context).cancelUniqueWork(DataSyncWorker.WORK_NAME)
+            _events.emit(SettingsEvent.Snackbar("已退出 Agent"))
+        }
+    }
+
+    fun onAgentSyncEnabledChanged(enabled: Boolean) {
+        viewModelScope.launch {
+            agentPreferencesStore.updateSyncEnabled(enabled)
+            if (enabled) {
+                scheduleSyncWorker()
+                _events.emit(SettingsEvent.Snackbar("数据同步已开启"))
+            } else {
+                WorkManager.getInstance(context).cancelUniqueWork(DataSyncWorker.WORK_NAME)
+                _events.emit(SettingsEvent.Snackbar("数据同步已关闭"))
+            }
+        }
+    }
+
+    fun onAgentEnabledChanged(enabled: Boolean) {
+        viewModelScope.launch {
+            agentPreferencesStore.updateAgentEnabled(enabled)
+        }
+    }
+
+    fun triggerSyncNow() {
+        val request = OneTimeWorkRequestBuilder<DataSyncWorker>()
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .build()
+        WorkManager.getInstance(context).enqueue(request)
+        viewModelScope.launch {
+            _events.emit(SettingsEvent.Snackbar("正在同步..."))
+        }
+    }
+
+    private fun scheduleSyncWorker() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = PeriodicWorkRequestBuilder<DataSyncWorker>(6, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            DataSyncWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
+    }
+
     companion object {
         val Factory = viewModelFactory {
             initializer {
                 val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HElDairyApplication)
+                val container = app.appContainer
                 SettingsViewModel(
                     context = app.applicationContext,
-                    preferencesStore = app.appContainer.aiPreferencesStore,
-                    userProfileStore = app.appContainer.userProfileStore,
-                    dailyReportPreferencesStore = app.appContainer.dailyReportPreferencesStore,
-                    backupManager = app.appContainer.backupManager
+                    preferencesStore = container.aiPreferencesStore,
+                    userProfileStore = container.userProfileStore,
+                    dailyReportPreferencesStore = container.dailyReportPreferencesStore,
+                    backupManager = container.backupManager,
+                    agentPreferencesStore = container.agentPreferencesStore,
+                    appContainerImpl = container as? AppContainerImpl
                 )
             }
         }
@@ -166,7 +330,17 @@ data class SettingsUiState(
     val dailyReminderEnabled: Boolean = true,
     val userName: String = "Kitty宝贝",
     val avatarUri: String? = null,
-    val isSaving: Boolean = false
+    val isSaving: Boolean = false,
+    // ── Agent ──
+    val agentServerUrl: String = "",
+    val agentUsernameInput: String = "",
+    val agentPasswordInput: String = "",
+    val agentLoggedInUsername: String = "",
+    val agentIsLoggedIn: Boolean = false,
+    val agentSyncEnabled: Boolean = false,
+    val agentEnabled: Boolean = false,
+    val agentIsLoading: Boolean = false,
+    val agentLastSyncTimestamp: Long = 0L
 ) {
     val isApiKeyDirty: Boolean get() = apiKeyInput != lastSavedApiKey
 }
