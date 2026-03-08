@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
+import com.heldairy.core.network.agent.AgentClient
 import com.heldairy.core.preferences.AiPreferencesStore
 import com.heldairy.feature.medication.reminder.ReminderScheduler
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -24,6 +25,7 @@ class MedicationDetailViewModel(
     private val repository: MedicationRepository,
     private val summaryGenerator: MedicationInfoSummaryGenerator,
     private val preferencesStore: AiPreferencesStore,
+    private val agentClient: AgentClient?,
     private val context: Context,
     private val medId: Long
 ) : ViewModel() {
@@ -257,6 +259,27 @@ class MedicationDetailViewModel(
                 }
 
                 _events.emit(DetailEvent.ShowMessage("正在生成药品简介..."))
+
+                val agentSummary = runCatching {
+                    val client = agentClient ?: throw IllegalStateException("Agent 不可用")
+                    client.fetchMedInfoSummary(
+                        medName = med.name,
+                        aliases = med.aliases?.split("，", ",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
+                    )
+                }.getOrNull()
+
+                if (!agentSummary.isNullOrBlank()) {
+                    repository.updateMed(
+                        id = med.id,
+                        name = med.name,
+                        aliases = med.aliases,
+                        note = med.note,
+                        infoSummary = agentSummary
+                    )
+                    loadMed()
+                    _events.emit(DetailEvent.ShowMessage("简介生成成功"))
+                    return@launch
+                }
                 
                 val settings = preferencesStore.currentSettings()
                 val apiKey = settings.apiKey
@@ -465,6 +488,7 @@ class MedicationDetailViewModel(
                     repository = app.appContainer.medicationRepository,
                     summaryGenerator = app.appContainer.medicationInfoSummaryGenerator,
                     preferencesStore = app.appContainer.aiPreferencesStore,
+                    agentClient = app.appContainer.agentClient,
                     context = app.applicationContext,
                     medId = medId
                 )

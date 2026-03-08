@@ -192,6 +192,10 @@ class SettingsViewModel(
         _uiState.update { it.copy(agentUsernameInput = value) }
     }
 
+    fun onAgentEmailChanged(value: String) {
+        _uiState.update { it.copy(agentEmailInput = value) }
+    }
+
     fun onAgentPasswordChanged(value: String) {
         _uiState.update { it.copy(agentPasswordInput = value) }
     }
@@ -227,8 +231,13 @@ class SettingsViewModel(
     fun agentRegister() {
         val username = _uiState.value.agentUsernameInput
         val password = _uiState.value.agentPasswordInput
-        if (username.isBlank() || password.isBlank()) {
-            viewModelScope.launch { _events.emit(SettingsEvent.Snackbar("请输入用户名和密码")) }
+        val email = _uiState.value.agentEmailInput.trim()
+        if (username.isBlank() || password.isBlank() || email.isBlank()) {
+            viewModelScope.launch { _events.emit(SettingsEvent.Snackbar("请输入用户名、邮箱和密码")) }
+            return
+        }
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            viewModelScope.launch { _events.emit(SettingsEvent.Snackbar("请输入有效邮箱地址")) }
             return
         }
         viewModelScope.launch {
@@ -239,7 +248,7 @@ class SettingsViewModel(
                 _uiState.update { it.copy(agentIsLoading = false) }
                 return@launch
             }
-            client.register(username, password, displayName = _uiState.value.userName)
+            client.register(username, password, email = email, displayName = _uiState.value.userName)
                 .onSuccess { tokens ->
                     agentPreferencesStore.saveLoginResult(tokens.accessToken, tokens.refreshToken, username)
                     _uiState.update { it.copy(agentIsLoading = false, agentPasswordInput = "") }
@@ -334,6 +343,7 @@ data class SettingsUiState(
     // ── Agent ──
     val agentServerUrl: String = "",
     val agentUsernameInput: String = "",
+    val agentEmailInput: String = "",
     val agentPasswordInput: String = "",
     val agentLoggedInUsername: String = "",
     val agentIsLoggedIn: Boolean = false,

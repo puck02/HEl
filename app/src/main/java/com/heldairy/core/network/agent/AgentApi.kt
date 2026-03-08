@@ -23,6 +23,7 @@ import com.heldairy.core.network.agent.SyncUploadRequest
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Query
 
 /**
  * hel-agent 后端 REST API 定义
@@ -74,6 +75,15 @@ interface AgentApi {
 
     @POST("api/v1/sync/upload")
     suspend fun syncUpload(@Body body: SyncUploadRequest): SyncResponse
+
+    @POST("api/v1/sync/push")
+    suspend fun syncPush(@Body body: SyncPushRequest): SyncPushResponse
+
+    @GET("api/v1/sync/pull")
+    suspend fun syncPull(
+        @Query("since") since: Long,
+        @Query("limit") limit: Int = 200
+    ): SyncPullResponse
 
     @GET("api/v1/sync/status")
     suspend fun syncStatus(): SyncStatusResponse

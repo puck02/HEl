@@ -60,7 +60,7 @@ class AgentClient(
     suspend fun register(
         username: String,
         password: String,
-        email: String? = null,
+        email: String,
         displayName: String? = null
     ): Result<AgentTokenResponse> = runCatching {
         api.register(
@@ -163,13 +163,29 @@ class AgentClient(
     suspend fun parseMedicationNlp(rawText: String): MedicationNlpResult {
         ensureReady()
         val resp = api.medicationParseNlp(AgentMedNlpParseRequest(rawText))
+
+        val primaryAction = resp.actions.firstOrNull {
+            it.actionType == "start_course" || it.actionType == "update_course" || it.actionType == "add_med"
+        } ?: resp.actions.firstOrNull()
+
+        val medName = primaryAction?.medName ?: resp.mentionedMeds.firstOrNull()?.name.orEmpty()
+        if (medName.isBlank()) {
+            throw IllegalStateException("Agent 未识别到药物名称")
+        }
+
+        val courseFields = primaryAction?.courseFields.orEmpty()
+        val frequency = courseFields["frequencyText"] ?: courseFields["frequency_text"]
+        val dose = courseFields["doseText"] ?: courseFields["dose_text"]
+        val timeHints = courseFields["timeHints"] ?: courseFields["time_hints"]
+        val note = resp.questions.firstOrNull()?.text
+
         return MedicationNlpResult(
-            name = resp.name,
-            aliases = resp.aliases,
-            frequency = resp.frequency,
-            dose = resp.dose,
-            timeHints = resp.timeHints,
-            note = resp.note
+            name = medName,
+            aliases = emptyList(),
+            frequency = frequency,
+            dose = dose,
+            timeHints = timeHints,
+            note = note
         )
     }
 
@@ -182,10 +198,30 @@ class AgentClient(
         currentFrequency: String? = null
     ): String {
         ensureReady()
+        val text = buildString {
+            append("药品名称：")
+            append(medName)
+            if (aliases.isNotEmpty()) {
+                append("\n别名：")
+                append(aliases.joinToString("，"))
+            }
+            if (!currentDose.isNullOrBlank()) {
+                append("\n当前剂量：")
+                append(currentDose)
+            }
+            if (!currentFrequency.isNullOrBlank()) {
+                append("\n当前频率：")
+                append(currentFrequency)
+            }
+        }
         val resp = api.medicationInfoSummary(
-            AgentMedInfoSummaryRequest(medName, aliases, currentDose, currentFrequency)
+            AgentMedInfoSummaryRequest(text = text, medName = medName)
         )
-        return resp.summary
+        return listOfNotNull(
+            resp.dosageSummary?.takeIf { it.isNotBlank() }?.let { "用法用量：$it" },
+            resp.cautionsSummary?.takeIf { it.isNotBlank() }?.let { "注意事项：$it" },
+            resp.adverseSummary?.takeIf { it.isNotBlank() }?.let { "不良反应：$it" }
+        ).joinToString("\n")
     }
 
     // ── Sync ─────────────────────────────────────────────
@@ -193,6 +229,16 @@ class AgentClient(
     suspend fun syncUpload(request: SyncUploadRequest): SyncResponse {
         ensureReady()
         return api.syncUpload(request)
+    }
+
+    suspend fun syncPush(request: SyncPushRequest): SyncPushResponse {
+        ensureReady()
+        return api.syncPush(request)
+    }
+
+    suspend fun syncPull(since: Long, limit: Int = 200): SyncPullResponse {
+        ensureReady()
+        return api.syncPull(since = since, limit = limit)
     }
 
     suspend fun syncStatus(): SyncStatusResponse {

@@ -178,6 +178,7 @@ fun SettingsRoute(
                 onAgentServerUrlChanged = viewModel::onAgentServerUrlChanged,
                 onSaveAgentServerUrl = viewModel::saveAgentServerUrl,
                 onAgentUsernameChanged = viewModel::onAgentUsernameChanged,
+                onAgentEmailChanged = viewModel::onAgentEmailChanged,
                 onAgentPasswordChanged = viewModel::onAgentPasswordChanged,
                 onAgentLogin = viewModel::agentLogin,
                 onAgentRegister = viewModel::agentRegister,
@@ -212,6 +213,7 @@ fun SettingsScreen(
     onAgentServerUrlChanged: (String) -> Unit = {},
     onSaveAgentServerUrl: () -> Unit = {},
     onAgentUsernameChanged: (String) -> Unit = {},
+    onAgentEmailChanged: (String) -> Unit = {},
     onAgentPasswordChanged: (String) -> Unit = {},
     onAgentLogin: () -> Unit = {},
     onAgentRegister: () -> Unit = {},
@@ -277,6 +279,7 @@ fun SettingsScreen(
             onServerUrlChanged = onAgentServerUrlChanged,
             onSaveServerUrl = onSaveAgentServerUrl,
             onUsernameChanged = onAgentUsernameChanged,
+            onEmailChanged = onAgentEmailChanged,
             onPasswordChanged = onAgentPasswordChanged,
             onLogin = onAgentLogin,
             onRegister = onAgentRegister,
@@ -734,6 +737,7 @@ private fun AgentSection(
     onServerUrlChanged: (String) -> Unit,
     onSaveServerUrl: () -> Unit,
     onUsernameChanged: (String) -> Unit,
+    onEmailChanged: (String) -> Unit,
     onPasswordChanged: (String) -> Unit,
     onLogin: () -> Unit,
     onRegister: () -> Unit,
@@ -863,6 +867,13 @@ private fun AgentSection(
                     value = state.agentUsernameInput,
                     onValueChange = onUsernameChanged,
                     label = { Text("用户名") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = state.agentEmailInput,
+                    onValueChange = onEmailChanged,
+                    label = { Text("邮箱") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

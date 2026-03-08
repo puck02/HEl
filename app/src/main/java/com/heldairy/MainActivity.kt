@@ -327,7 +327,8 @@ fun HElDairyApp() {
                                 factory = AddMedicationViewModel.factory(
                                     repository = app.appContainer.medicationRepository,
                                     nlpParser = app.appContainer.medicationNlpParser,
-                                    preferencesStore = app.appContainer.aiPreferencesStore
+                                    preferencesStore = app.appContainer.aiPreferencesStore,
+                                    agentClient = app.appContainer.agentClient
                                 )
                             )
                             AddMedicationRoute(

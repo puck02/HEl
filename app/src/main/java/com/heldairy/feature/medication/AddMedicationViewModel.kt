@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
+import com.heldairy.core.network.agent.AgentClient
 import com.heldairy.core.preferences.AiPreferencesStore
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +21,8 @@ import java.time.LocalDate
 class AddMedicationViewModel(
     private val repository: MedicationRepository,
     private val nlpParser: MedicationNlpParser,
-    private val preferencesStore: AiPreferencesStore
+    private val preferencesStore: AiPreferencesStore,
+    private val agentClient: AgentClient?
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddUiState())
@@ -45,6 +47,28 @@ class AddMedicationViewModel(
         _uiState.update { it.copy(isParsing = true, parseError = null) }
 
         viewModelScope.launch {
+            val agentResult = runCatching {
+                val client = agentClient ?: throw IllegalStateException("Agent 不可用")
+                client.parseMedicationNlp(input)
+            }
+
+            if (agentResult.isSuccess) {
+                val result = agentResult.getOrThrow()
+                _uiState.update {
+                    it.copy(
+                        isParsing = false,
+                        parseError = null,
+                        name = result.name,
+                        aliases = result.aliases.joinToString("，"),
+                        frequency = result.frequency ?: "",
+                        dose = result.dose ?: "",
+                        timeHints = result.timeHints ?: "",
+                        note = result.note ?: ""
+                    )
+                }
+                return@launch
+            }
+
             val settings = preferencesStore.currentSettings()
             val apiKey = settings.apiKey
             
@@ -206,10 +230,11 @@ class AddMedicationViewModel(
         fun factory(
             repository: MedicationRepository,
             nlpParser: MedicationNlpParser,
-            preferencesStore: AiPreferencesStore
+            preferencesStore: AiPreferencesStore,
+            agentClient: AgentClient?
         ): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                AddMedicationViewModel(repository, nlpParser, preferencesStore)
+                AddMedicationViewModel(repository, nlpParser, preferencesStore, agentClient)
             }
         }
     }

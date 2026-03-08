@@ -2,6 +2,7 @@ package com.heldairy.core.network.agent
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 // ═══════════════════════════════════════════════════════════
 // Agent API 请求 / 响应数据模型
@@ -14,7 +15,7 @@ import kotlinx.serialization.Serializable
 data class AgentRegisterRequest(
     val username: String,
     val password: String,
-    val email: String? = null,
+    val email: String,
     @SerialName("display_name") val displayName: String? = null
 )
 
@@ -134,17 +135,35 @@ data class AgentWeeklyInsightResponse(
 
 @Serializable
 data class AgentMedNlpParseRequest(
-    @SerialName("raw_text") val rawText: String
+    @SerialName("raw_text") val rawText: String,
+    @SerialName("current_meds") val currentMeds: List<String> = emptyList(),
+    @SerialName("active_courses_summary") val activeCoursesSummary: List<Map<String, String>>? = null
+)
+
+@Serializable
+data class AgentMedMentionedMed(
+    val name: String,
+    @SerialName("in_library") val inLibrary: Boolean = false
+)
+
+@Serializable
+data class AgentMedAction(
+    @SerialName("action_type") val actionType: String,
+    @SerialName("med_name") val medName: String,
+    @SerialName("course_fields") val courseFields: Map<String, String>? = null
+)
+
+@Serializable
+data class AgentMedQuestion(
+    val text: String,
+    val options: List<String>? = null
 )
 
 @Serializable
 data class AgentMedNlpParseResponse(
-    val name: String,
-    val aliases: List<String> = emptyList(),
-    val frequency: String? = null,
-    val dose: String? = null,
-    @SerialName("time_hints") val timeHints: String? = null,
-    val note: String? = null,
+    @SerialName("mentioned_meds") val mentionedMeds: List<AgentMedMentionedMed> = emptyList(),
+    val actions: List<AgentMedAction> = emptyList(),
+    val questions: List<AgentMedQuestion> = emptyList(),
     val model: String? = null
 )
 
@@ -152,15 +171,16 @@ data class AgentMedNlpParseResponse(
 
 @Serializable
 data class AgentMedInfoSummaryRequest(
-    @SerialName("med_name") val medName: String,
-    val aliases: List<String> = emptyList(),
-    @SerialName("current_dose") val currentDose: String? = null,
-    @SerialName("current_frequency") val currentFrequency: String? = null
+    val text: String,
+    @SerialName("med_name") val medName: String? = null
 )
 
 @Serializable
 data class AgentMedInfoSummaryResponse(
-    val summary: String,
+    @SerialName("name_candidates") val nameCandidates: List<String> = emptyList(),
+    @SerialName("dosage_summary") val dosageSummary: String? = null,
+    @SerialName("cautions_summary") val cautionsSummary: String? = null,
+    @SerialName("adverse_summary") val adverseSummary: String? = null,
     val model: String? = null
 )
 
@@ -242,5 +262,69 @@ data class SyncResponse(
 data class SyncStatusResponse(
     @SerialName("last_sync_timestamp") val lastSyncTimestamp: Long = 0,
     @SerialName("total_entries") val totalEntries: Int = 0,
-    @SerialName("total_medications") val totalMedications: Int = 0
+    @SerialName("total_medications") val totalMedications: Int = 0,
+    @SerialName("server_cursor") val serverCursor: Long = 0,
+    val capabilities: List<String> = emptyList(),
+    @SerialName("last_push_ack") val lastPushAck: String? = null
+)
+
+@Serializable
+data class SyncChange(
+    val entity: String,
+    val op: String,
+    val payload: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class SyncPushRequest(
+    @SerialName("client_change_id") val clientChangeId: String,
+    @SerialName("base_server_version") val baseServerVersion: Long = 0,
+    val changes: List<SyncChange> = emptyList()
+)
+
+@Serializable
+data class SyncPushResult(
+    val entity: String,
+    val op: String,
+    val status: String,
+    @SerialName("android_id") val androidId: Long? = null,
+    @SerialName("server_id") val serverId: Long? = null,
+    @SerialName("server_version") val serverVersion: Long? = null,
+    @SerialName("conflict_reason") val conflictReason: String? = null
+)
+
+@Serializable
+data class SyncPushResponse(
+    val message: String,
+    val accepted: Int = 0,
+    val applied: Int = 0,
+    val conflicts: Int = 0,
+    @SerialName("server_timestamp") val serverTimestamp: Long = 0,
+    @SerialName("server_cursor") val serverCursor: Long = 0,
+    val results: List<SyncPushResult> = emptyList()
+)
+
+@Serializable
+data class SyncEntityEnvelope(
+    val entity: String,
+    @SerialName("record_id") val recordId: Long,
+    @SerialName("server_version") val serverVersion: Long,
+    @SerialName("updated_at") val updatedAt: Long,
+    val payload: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class SyncTombstone(
+    val entity: String,
+    @SerialName("record_id") val recordId: Long,
+    @SerialName("deleted_at") val deletedAt: Long,
+    val payload: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class SyncPullResponse(
+    val changes: List<SyncEntityEnvelope> = emptyList(),
+    val tombstones: List<SyncTombstone> = emptyList(),
+    @SerialName("next_cursor") val nextCursor: Long = 0,
+    @SerialName("server_time") val serverTime: Long = 0
 )
