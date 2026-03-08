@@ -27,7 +27,7 @@ object Constants {
         /** DeepSeek API Base URL */
         const val DEEPSEEK_BASE_URL = "https://api.deepseek.com/"
         /** Agent 智能体默认服务器地址 */
-        const val AGENT_DEFAULT_BASE_URL = "http://10.0.2.2:8000/"
+        const val AGENT_DEFAULT_BASE_URL = "http://10.0.2.2:8011/"
     }
 
     /* ── WorkManager 调度 ────────────────────────────────── */

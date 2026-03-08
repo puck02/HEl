@@ -787,7 +787,7 @@ private fun AgentSection(
                 OutlinedTextField(
                     value = state.agentServerUrl,
                     onValueChange = onServerUrlChanged,
-                    placeholder = { Text("http://your-server:8000") },
+                    placeholder = { Text("http://your-server:8011") },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     textStyle = androidx.compose.material3.MaterialTheme.typography.bodySmall

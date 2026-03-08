@@ -1,6 +1,7 @@
 package com.heldairy.core.preferences
 
 import android.content.Context
+import com.heldairy.core.util.Constants
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -33,7 +34,8 @@ class AgentPreferencesStore(context: Context) {
         .catch { emit(emptyPreferences()) }
         .map { prefs ->
             AgentSettings(
-                serverUrl = prefs[SERVER_URL] ?: "",
+                serverUrl = prefs[SERVER_URL]
+                    ?: Constants.Network.AGENT_DEFAULT_BASE_URL.trimEnd('/'),
                 accessToken = prefs[ACCESS_TOKEN] ?: "",
                 refreshToken = prefs[REFRESH_TOKEN] ?: "",
                 syncEnabled = prefs[SYNC_ENABLED] ?: false,
