@@ -1,6 +1,8 @@
 package com.heldairy.feature.settings
 
 import android.content.Context
+import android.net.Uri
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
@@ -180,8 +182,16 @@ class SettingsViewModel(
     }
 
     fun saveAgentServerUrl() {
-        val url = _uiState.value.agentServerUrl
+        val url = normalizeServerUrl(_uiState.value.agentServerUrl)
         viewModelScope.launch {
+            if (url == null) {
+                _events.emit(SettingsEvent.Snackbar("服务器地址格式错误，请使用 http://IP:端口"))
+                return@launch
+            }
+            val host = Uri.parse(url).host.orEmpty()
+            if (!isProbablyEmulator() && host == "10.0.2.2") {
+                _events.emit(SettingsEvent.Snackbar("10.0.2.2 仅模拟器可用；真机请填写电脑局域网 IP"))
+            }
             agentPreferencesStore.updateServerUrl(url)
             appContainerImpl?.rebuildAgentClient(url)
             _events.emit(SettingsEvent.Snackbar("Agent 服务器地址已保存"))
@@ -209,6 +219,14 @@ class SettingsViewModel(
         }
         viewModelScope.launch {
             _uiState.update { it.copy(agentIsLoading = true) }
+            val normalizedUrl = normalizeServerUrl(_uiState.value.agentServerUrl)
+            if (normalizedUrl == null) {
+                _events.emit(SettingsEvent.Snackbar("服务器地址格式错误，请使用 http://IP:端口"))
+                _uiState.update { it.copy(agentIsLoading = false) }
+                return@launch
+            }
+            agentPreferencesStore.updateServerUrl(normalizedUrl)
+            appContainerImpl?.rebuildAgentClient(normalizedUrl)
             val client = appContainerImpl?.agentClient
             if (client == null) {
                 _events.emit(SettingsEvent.Snackbar("请先配置 Agent 服务器地址"))
@@ -242,6 +260,20 @@ class SettingsViewModel(
         }
         viewModelScope.launch {
             _uiState.update { it.copy(agentIsLoading = true) }
+            val normalizedUrl = normalizeServerUrl(_uiState.value.agentServerUrl)
+            if (normalizedUrl == null) {
+                _events.emit(SettingsEvent.Snackbar("服务器地址格式错误，请使用 http://IP:端口"))
+                _uiState.update { it.copy(agentIsLoading = false) }
+                return@launch
+            }
+            val host = Uri.parse(normalizedUrl).host.orEmpty()
+            if (!isProbablyEmulator() && host == "10.0.2.2") {
+                _events.emit(SettingsEvent.Snackbar("当前像是真机：请把地址改成电脑局域网 IP（如 http://172.20.x.x:8011）"))
+                _uiState.update { it.copy(agentIsLoading = false) }
+                return@launch
+            }
+            agentPreferencesStore.updateServerUrl(normalizedUrl)
+            appContainerImpl?.rebuildAgentClient(normalizedUrl)
             val client = appContainerImpl?.agentClient
             if (client == null) {
                 _events.emit(SettingsEvent.Snackbar("请先配置 Agent 服务器地址"))
@@ -329,6 +361,31 @@ class SettingsViewModel(
                 )
             }
         }
+    }
+
+    private fun normalizeServerUrl(raw: String): String? {
+        val trimmed = raw.trim()
+        if (trimmed.isBlank()) return null
+        val withScheme = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            trimmed
+        } else {
+            "http://$trimmed"
+        }
+        val uri = runCatching { Uri.parse(withScheme) }.getOrNull() ?: return null
+        val host = uri.host ?: return null
+        val scheme = uri.scheme ?: return null
+        if (scheme != "http" && scheme != "https") return null
+        if (host.isBlank()) return null
+        return withScheme.trimEnd('/')
+    }
+
+    private fun isProbablyEmulator(): Boolean {
+        return Build.FINGERPRINT.startsWith("generic") ||
+            Build.FINGERPRINT.lowercase().contains("emulator") ||
+            Build.MODEL.contains("Emulator") ||
+            Build.MODEL.contains("Android SDK built for x86") ||
+            Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic") ||
+            Build.PRODUCT.contains("sdk")
     }
 }
 

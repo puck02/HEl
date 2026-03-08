@@ -9,6 +9,10 @@ import com.heldairy.core.network.NetworkMonitor
 import com.heldairy.core.network.NetworkUnavailableException
 import com.heldairy.core.preferences.AgentPreferencesStore
 import com.heldairy.feature.medication.MedicationNlpResult
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import retrofit2.HttpException
 
 /**
  * hel-agent 后端高级封装
@@ -62,14 +66,54 @@ class AgentClient(
         password: String,
         email: String,
         displayName: String? = null
-    ): Result<AgentTokenResponse> = runCatching {
-        api.register(
-            AgentRegisterRequest(username, password, email, displayName)
-        )
+    ): Result<AgentTokenResponse> {
+        return try {
+            Result.success(
+                api.register(
+                    AgentRegisterRequest(username, password, email, displayName)
+                )
+            )
+        } catch (t: Throwable) {
+            Result.failure(mapAuthThrowable(t))
+        }
     }
 
-    suspend fun login(username: String, password: String): Result<AgentTokenResponse> = runCatching {
-        api.login(AgentLoginRequest(username, password))
+    suspend fun login(username: String, password: String): Result<AgentTokenResponse> {
+        return try {
+            Result.success(api.login(AgentLoginRequest(username, password)))
+        } catch (t: Throwable) {
+            Result.failure(mapAuthThrowable(t))
+        }
+    }
+
+    private fun mapAuthThrowable(t: Throwable): Throwable {
+        if (t is HttpException) {
+            val body = runCatching { t.response()?.errorBody()?.string().orEmpty() }.getOrDefault("")
+            val msg = when (t.code()) {
+                401 -> "用户名或密码错误"
+                409 -> when {
+                    body.contains("Username already exists", ignoreCase = true) -> "用户名已存在，请直接登录"
+                    body.contains("Email already registered", ignoreCase = true) -> "邮箱已被注册，请直接登录或更换邮箱"
+                    else -> "账号已存在，请直接登录"
+                }
+                503 -> "服务器暂时不可用，请稍后重试"
+                500 -> "服务器内部错误，请稍后重试"
+                else -> "请求失败（HTTP ${t.code()}）"
+            }
+            return IllegalStateException(msg, t)
+        }
+
+        if (t is ConnectException || t is SocketTimeoutException || t is UnknownHostException) {
+            val raw = t.message.orEmpty()
+            val hint = if (raw.contains("10.0.2.2")) {
+                "连接失败：10.0.2.2 仅用于 Android 模拟器；真机请使用电脑局域网 IP（如 http://172.20.x.x:8011）"
+            } else {
+                "连接失败：请检查服务器地址与端口，确保后端已启动"
+            }
+            return IllegalStateException(hint, t)
+        }
+
+        return IllegalStateException(t.message ?: "请求失败", t)
     }
 
     // ── Chat ──────────────────────────────────────────────
