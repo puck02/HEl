@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,7 +34,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Send
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,10 +52,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.heldairy.R
 import com.heldairy.feature.chat.ChatMessage
 import com.heldairy.feature.chat.ChatUiState
 import com.heldairy.feature.chat.ChatViewModel
@@ -98,6 +103,7 @@ fun ChatScreen(
     KittyBackground(backgroundRes = BackgroundTheme.HOME) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0f),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
                 TopAppBar(
                     title = {
@@ -105,13 +111,15 @@ fun ChatScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(Spacing.XS)
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.AutoAwesome,
+                            Image(
+                                painter = painterResource(id = R.drawable.default_avatar_kitty),
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
                             )
-                            Text("AI 健康助手")
+                            Text("Kitty 健康管家 \uD83C\uDF80")
                         }
                     },
                     navigationIcon = {
@@ -130,10 +138,11 @@ fun ChatScreen(
             bottomBar = {
                 Column(
                     modifier = Modifier
+                        .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
                         .navigationBarsPadding()
                         .imePadding()
-                        .padding(horizontal = Spacing.M, vertical = Spacing.S)
+                        .padding(horizontal = Spacing.M, vertical = Spacing.M)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -208,25 +217,17 @@ private fun ChatWelcome(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(
+        Image(
+            painter = painterResource(id = R.drawable.default_avatar_kitty),
+            contentDescription = null,
             modifier = Modifier
                 .size(72.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.AutoAwesome,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(36.dp)
-            )
-        }
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
         Spacer(modifier = Modifier.height(Spacing.M))
         Text(
-            text = "你好，我是你的 AI 健康助手",
+            text = "你好，我是 Kitty 健康管家 \uD83C\uDF80",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -246,22 +247,14 @@ private fun MessageBubble(message: ChatMessage) {
         horizontalArrangement = if (message.isFromUser) Arrangement.End else Arrangement.Start
     ) {
         if (!message.isFromUser) {
-            Box(
+            Image(
+                painter = painterResource(id = R.drawable.default_avatar_kitty),
+                contentDescription = null,
                 modifier = Modifier
                     .size(32.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.AutoAwesome,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
             Spacer(modifier = Modifier.width(Spacing.XS))
         }
 
