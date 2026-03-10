@@ -280,7 +280,15 @@ fun HElDairyApp() {
         }
 
         var selectedIndex by rememberSaveable { mutableStateOf(0) }
+        var showChatScreen by rememberSaveable { mutableStateOf(false) }
 
+        // When chat is open, render it full-screen (no bottom nav)
+        if (showChatScreen) {
+            ChatRoute(
+                paddingValues = PaddingValues(0.dp),
+                onBack = { showChatScreen = false }
+            )
+        } else {
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             bottomBar = {
@@ -293,13 +301,6 @@ fun HElDairyApp() {
         ) { innerPadding ->
             when (selectedIndex) {
                 0 -> {
-                    var showChatScreen by rememberSaveable { mutableStateOf(false) }
-                    if (showChatScreen) {
-                        ChatRoute(
-                            paddingValues = innerPadding,
-                            onBack = { showChatScreen = false }
-                        )
-                    } else {
                         HomeGreetingRoute(
                             paddingValues = innerPadding,
                             onStartDaily = { selectedIndex = 1 },
@@ -309,7 +310,6 @@ fun HElDairyApp() {
                             isDarkTheme = isDarkTheme,
                             onToggleTheme = onToggleTheme
                         )
-                    }
                 }
                 1 -> DailyReportRoute(
                     paddingValues = innerPadding,
@@ -365,6 +365,7 @@ fun HElDairyApp() {
                 )
             }
         }
+        } // end else (not chat)
     }
 }
 
