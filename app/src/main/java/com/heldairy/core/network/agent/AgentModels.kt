@@ -57,7 +57,7 @@ data class AgentChatRequest(
 
 @Serializable
 data class AgentChatResponse(
-    val response: String,
+    @SerialName("answer") val answer: String,
     @SerialName("session_id") val sessionId: String,
     @SerialName("agent_used") val agentUsed: String? = null,
     @SerialName("model_used") val modelUsed: String? = null

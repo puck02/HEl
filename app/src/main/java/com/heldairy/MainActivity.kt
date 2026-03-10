@@ -106,6 +106,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import android.app.Activity
 import android.content.Context
 import android.os.Build
+import com.heldairy.feature.chat.ui.ChatRoute
 import com.heldairy.feature.home.HomeDashboardUiState
 import com.heldairy.feature.home.HomeDashboardViewModel
 import com.heldairy.feature.home.MetricDisplay
@@ -291,14 +292,25 @@ fun HElDairyApp() {
             }
         ) { innerPadding ->
             when (selectedIndex) {
-                0 -> HomeGreetingRoute(
-                    paddingValues = innerPadding,
-                    onStartDaily = { selectedIndex = 1 },
-                    onOpenInsights = { selectedIndex = 2 },
-                    carePrompt = homeCarePrompt,
-                    isDarkTheme = isDarkTheme,
-                    onToggleTheme = onToggleTheme
-                )
+                0 -> {
+                    var showChatScreen by rememberSaveable { mutableStateOf(false) }
+                    if (showChatScreen) {
+                        ChatRoute(
+                            paddingValues = innerPadding,
+                            onBack = { showChatScreen = false }
+                        )
+                    } else {
+                        HomeGreetingRoute(
+                            paddingValues = innerPadding,
+                            onStartDaily = { selectedIndex = 1 },
+                            onOpenInsights = { selectedIndex = 2 },
+                            onOpenChat = { showChatScreen = true },
+                            carePrompt = homeCarePrompt,
+                            isDarkTheme = isDarkTheme,
+                            onToggleTheme = onToggleTheme
+                        )
+                    }
+                }
                 1 -> DailyReportRoute(
                     paddingValues = innerPadding,
                     carePrompt = dailyCarePrompt
@@ -560,6 +572,7 @@ private fun HomeGreetingRoute(
     paddingValues: PaddingValues,
     onStartDaily: () -> Unit,
     onOpenInsights: () -> Unit,
+    onOpenChat: () -> Unit = {},
     carePrompt: String,
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit
@@ -578,6 +591,7 @@ private fun HomeGreetingRoute(
             uiState = previewState,
             onStartDaily = onStartDaily,
             onOpenInsights = onOpenInsights,
+            onOpenChat = onOpenChat,
             carePrompt = carePrompt,
             isDarkTheme = isDarkTheme,
             onToggleTheme = onToggleTheme
@@ -592,6 +606,7 @@ private fun HomeGreetingRoute(
         uiState = uiState,
         onStartDaily = onStartDaily,
         onOpenInsights = onOpenInsights,
+        onOpenChat = onOpenChat,
         carePrompt = carePrompt,
         isDarkTheme = isDarkTheme,
         onToggleTheme = onToggleTheme
@@ -604,6 +619,7 @@ private fun HomeGreetingScreen(
     uiState: HomeDashboardUiState,
     onStartDaily: () -> Unit,
     onOpenInsights: () -> Unit,
+    onOpenChat: () -> Unit = {},
     carePrompt: String,
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit
@@ -630,6 +646,7 @@ private fun HomeGreetingScreen(
             )
             MetricGrid(uiState = uiState, onStartDaily = onStartDaily)
             InsightsCTA(hasEntry = uiState.hasTodayEntry, onStartDaily = onStartDaily, onOpenInsights = onOpenInsights)
+            ChatEntryCard(onOpenChat = onOpenChat)
             Spacer(modifier = Modifier.height(Spacing.XXS))
         }
         }
@@ -778,6 +795,62 @@ private fun InsightsCTA(hasEntry: Boolean, onStartDaily: () -> Unit, onOpenInsig
                     isPressed = false
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ChatEntryCard(onOpenChat: () -> Unit) {
+    Card(
+        onClick = onOpenChat,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+        ),
+        shape = RoundedCornerShape(CornerRadius.Medium),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.Low),
+        modifier = Modifier
+            .padding(horizontal = Spacing.M)
+            .fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(Spacing.M),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.S)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.Chat,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "AI 健康助手",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "随时问我健康问题 ✨",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.ArrowForwardIos,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
