@@ -331,6 +331,19 @@ class SettingsViewModel(
         }
     }
 
+    fun forceFullSyncNow() {
+        viewModelScope.launch {
+            agentPreferencesStore.updateLastSyncTimestamp(0L)
+        }
+        val request = OneTimeWorkRequestBuilder<DataSyncWorker>()
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .build()
+        WorkManager.getInstance(context).enqueue(request)
+        viewModelScope.launch {
+            _events.emit(SettingsEvent.Snackbar("正在全量同步..."))
+        }
+    }
+
     private fun scheduleSyncWorker() {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)

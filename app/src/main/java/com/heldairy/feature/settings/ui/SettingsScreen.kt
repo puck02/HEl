@@ -186,6 +186,7 @@ fun SettingsRoute(
                 onAgentSyncEnabledChanged = viewModel::onAgentSyncEnabledChanged,
                 onAgentEnabledChanged = viewModel::onAgentEnabledChanged,
                 onTriggerSync = viewModel::triggerSyncNow,
+                onForceFullSync = viewModel::forceFullSyncNow,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
@@ -221,6 +222,7 @@ fun SettingsScreen(
     onAgentSyncEnabledChanged: (Boolean) -> Unit = {},
     onAgentEnabledChanged: (Boolean) -> Unit = {},
     onTriggerSync: () -> Unit = {},
+    onForceFullSync: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -286,7 +288,8 @@ fun SettingsScreen(
             onLogout = onAgentLogout,
             onSyncEnabledChanged = onAgentSyncEnabledChanged,
             onAgentEnabledChanged = onAgentEnabledChanged,
-            onTriggerSync = onTriggerSync
+            onTriggerSync = onTriggerSync,
+            onForceFullSync = onForceFullSync
         )
 
         DataManagementSection(onClearAllData = onClearAllData)
@@ -744,7 +747,8 @@ private fun AgentSection(
     onLogout: () -> Unit,
     onSyncEnabledChanged: (Boolean) -> Unit,
     onAgentEnabledChanged: (Boolean) -> Unit,
-    onTriggerSync: () -> Unit
+    onTriggerSync: () -> Unit,
+    onForceFullSync: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(
@@ -845,6 +849,17 @@ private fun AgentSection(
                             OutlinedButton(onClick = onTriggerSync, contentPadding = PaddingValues(horizontal = Spacing.S)) {
                                 Text("立即同步")
                             }
+                        }
+
+                        // 强制全量同步
+                        TextButton(
+                            onClick = onForceFullSync,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = androidx.compose.material3.MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("强制全量同步（重置同步记录）")
                         }
 
                         // 登出按钮
