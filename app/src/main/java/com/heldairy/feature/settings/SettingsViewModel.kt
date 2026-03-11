@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
+import com.heldairy.core.data.BackupManager
 import com.heldairy.core.di.AppContainerImpl
 import com.heldairy.core.preferences.AgentPreferencesStore
 import com.heldairy.core.preferences.DailyReportPreferencesStore
@@ -34,6 +35,7 @@ import java.util.concurrent.TimeUnit
 
 class SettingsViewModel(
     private val context: Context,
+    private val backupManager: BackupManager,
     private val userProfileStore: UserProfileStore,
     private val dailyReportPreferencesStore: DailyReportPreferencesStore,
     private val agentPreferencesStore: AgentPreferencesStore,
@@ -119,7 +121,10 @@ class SettingsViewModel(
             _uiState.update { it.copy(isClearingData = true) }
             client.clearUserData()
                 .onSuccess {
-                    _events.emit(SettingsEvent.Snackbar("服务器数据已清空"))
+                    // 服务器清理成功后，同时清理本地数据，避免 UI 仍显示旧记录。
+                    backupManager.clearAllData()
+                    agentPreferencesStore.updateLastSyncTimestamp(0L)
+                    _events.emit(SettingsEvent.Snackbar("服务器和本地数据已清空"))
                 }
                 .onFailure { e ->
                     _events.emit(SettingsEvent.Snackbar("清除失败: ${e.message}"))
@@ -326,6 +331,7 @@ class SettingsViewModel(
                 val container = app.appContainer
                 SettingsViewModel(
                     context = app.applicationContext,
+                    backupManager = container.backupManager,
                     userProfileStore = container.userProfileStore,
                     dailyReportPreferencesStore = container.dailyReportPreferencesStore,
                     agentPreferencesStore = container.agentPreferencesStore,

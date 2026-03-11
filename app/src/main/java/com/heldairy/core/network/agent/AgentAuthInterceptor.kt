@@ -20,7 +20,7 @@ class AgentAuthInterceptor(
     companion object {
         private const val TAG = "AgentAuth"
         /** 不需要 JWT 的路径 */
-        private val PUBLIC_PATHS = listOf("/auth/register", "/auth/login", "/health")
+        private val PUBLIC_PATHS = listOf("/auth/register", "/auth/login", "/auth/refresh", "/health")
     }
 
     override fun intercept(chain: Interceptor.Chain): Response {

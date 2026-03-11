@@ -120,7 +120,16 @@ class AgentClient(
 
     suspend fun chat(message: String, sessionId: String? = null): Result<AgentChatResponse> {
         ensureReady()
-        return runCatching { api.chat(AgentChatRequest(message, sessionId)) }
+        return try {
+            Result.success(api.chat(AgentChatRequest(message, sessionId)))
+        } catch (t: Throwable) {
+            if (t is HttpException && t.code() == 401) {
+                runCatching { agentPrefs.clearLogin() }
+                Result.failure(IllegalStateException("登录已失效，请重新登录 Agent", t))
+            } else {
+                Result.failure(t)
+            }
+        }
     }
 
     // ── Health — Daily Advice ────────────────────────────
