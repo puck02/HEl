@@ -8,11 +8,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
-import com.heldairy.core.data.BackupManager
 import com.heldairy.core.di.AppContainerImpl
-import com.heldairy.core.network.agent.AgentClient
 import com.heldairy.core.preferences.AgentPreferencesStore
-import com.heldairy.core.preferences.AiPreferencesStore
 import com.heldairy.core.preferences.DailyReportPreferencesStore
 import com.heldairy.core.preferences.UserProfileStore
 import com.heldairy.core.worker.DataSyncWorker
@@ -37,10 +34,8 @@ import java.util.concurrent.TimeUnit
 
 class SettingsViewModel(
     private val context: Context,
-    private val preferencesStore: AiPreferencesStore,
     private val userProfileStore: UserProfileStore,
     private val dailyReportPreferencesStore: DailyReportPreferencesStore,
-    private val backupManager: BackupManager,
     private val agentPreferencesStore: AgentPreferencesStore,
     private val appContainerImpl: AppContainerImpl?   // 需要调用 rebuildAgentClient
 ) : ViewModel() {
@@ -52,18 +47,6 @@ class SettingsViewModel(
     val events: SharedFlow<SettingsEvent> = _events.asSharedFlow()
 
     init {
-        viewModelScope.launch {
-            preferencesStore.settingsFlow.collectLatest { settings ->
-                _uiState.update { current ->
-                    val isDirty = current.apiKeyInput != current.lastSavedApiKey
-                    current.copy(
-                        lastSavedApiKey = settings.apiKey,
-                        apiKeyInput = if (isDirty) current.apiKeyInput else settings.apiKey,
-                        aiEnabled = settings.aiEnabled
-                    )
-                }
-            }
-        }
         viewModelScope.launch {
             userProfileStore.profileFlow.collectLatest { profile ->
                 _uiState.update { it.copy(userName = profile.userName, avatarUri = profile.avatarUri) }
@@ -88,34 +71,6 @@ class SettingsViewModel(
                     )
                 }
             }
-        }
-    }
-
-    fun onApiKeyChanged(value: String) {
-        _uiState.update { it.copy(apiKeyInput = value) }
-    }
-
-    fun onAiEnabledChanged(enabled: Boolean) {
-        _uiState.update { it.copy(aiEnabled = enabled) }
-        viewModelScope.launch {
-            preferencesStore.updateEnabled(enabled)
-        }
-    }
-
-    fun saveApiKey() {
-        val input = _uiState.value.apiKeyInput
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true) }
-            preferencesStore.updateApiKey(input)
-            _uiState.update { it.copy(isSaving = false) }
-            _events.emit(SettingsEvent.Snackbar("API Key 已更新"))
-        }
-    }
-
-    fun clearApiKey() {
-        viewModelScope.launch {
-            preferencesStore.updateApiKey("")
-            _events.emit(SettingsEvent.Snackbar("API Key 已清除"))
         }
     }
     
@@ -152,18 +107,24 @@ class SettingsViewModel(
         }
     }
 
-    suspend fun exportJson(): Result<String> {
-        return runCatching { backupManager.exportJson() }
-    }
-
-    suspend fun importJson(raw: String): Result<Unit> {
-        return backupManager.importJson(raw)
-    }
-
     fun clearAllData() {
+        val client = appContainerImpl?.agentClient
+        if (client == null) {
+            viewModelScope.launch {
+                _events.emit(SettingsEvent.Snackbar("请先登录 Agent 后再清除数据"))
+            }
+            return
+        }
         viewModelScope.launch {
-            backupManager.clearAllData()
-            _events.emit(SettingsEvent.Snackbar("所有数据已清空"))
+            _uiState.update { it.copy(isClearingData = true) }
+            client.clearUserData()
+                .onSuccess {
+                    _events.emit(SettingsEvent.Snackbar("服务器数据已清空"))
+                }
+                .onFailure { e ->
+                    _events.emit(SettingsEvent.Snackbar("清除失败: ${e.message}"))
+                }
+            _uiState.update { it.copy(isClearingData = false) }
         }
     }
 
@@ -365,10 +326,8 @@ class SettingsViewModel(
                 val container = app.appContainer
                 SettingsViewModel(
                     context = app.applicationContext,
-                    preferencesStore = container.aiPreferencesStore,
                     userProfileStore = container.userProfileStore,
                     dailyReportPreferencesStore = container.dailyReportPreferencesStore,
-                    backupManager = container.backupManager,
                     agentPreferencesStore = container.agentPreferencesStore,
                     appContainerImpl = container as? AppContainerImpl
                 )
@@ -403,13 +362,10 @@ class SettingsViewModel(
 }
 
 data class SettingsUiState(
-    val apiKeyInput: String = "",
-    val lastSavedApiKey: String = "",
-    val aiEnabled: Boolean = true,
     val dailyReminderEnabled: Boolean = true,
     val userName: String = "Kitty宝贝",
     val avatarUri: String? = null,
-    val isSaving: Boolean = false,
+    val isClearingData: Boolean = false,
     // ── Agent ──
     val agentServerUrl: String = "",
     val agentUsernameInput: String = "",
@@ -421,9 +377,7 @@ data class SettingsUiState(
     val agentEnabled: Boolean = false,
     val agentIsLoading: Boolean = false,
     val agentLastSyncTimestamp: Long = 0L
-) {
-    val isApiKeyDirty: Boolean get() = apiKeyInput != lastSavedApiKey
-}
+)
 
 sealed interface SettingsEvent {
     data class Snackbar(val message: String) : SettingsEvent

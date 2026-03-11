@@ -207,6 +207,249 @@ object FollowUpRuleEngine {
                     )
                 )
             )
+        ),
+        FollowUpRule(
+            symptomQuestionId = "mood_irritability",
+            focusOptionId = "emotion",
+            questions = listOf(
+                DailyQuestion(
+                    id = "fu_emotion_trigger",
+                    title = "今天情绪波动主要和什么有关？",
+                    prompt = "选最贴近的一项，我会给你更针对的建议。",
+                    step = DailyQuestionStep.FollowUp,
+                    order = 150,
+                    required = true,
+                    kind = QuestionKind.SingleChoice(
+                        options = listOf(
+                            QuestionOption("work_study", "工作/学习压力"),
+                            QuestionOption("sleep_related", "睡眠不足或作息紊乱"),
+                            QuestionOption("body_discomfort", "身体不适带来的烦躁"),
+                            QuestionOption("social", "人际/家庭因素"),
+                            QuestionOption("unknown", "说不清，综合因素")
+                        )
+                    )
+                ),
+                DailyQuestion(
+                    id = "fu_emotion_relief",
+                    title = "今天有没有什么方式让你缓解一些？",
+                    prompt = "我想知道哪些方法对你更有效。",
+                    step = DailyQuestionStep.FollowUp,
+                    order = 151,
+                    required = true,
+                    kind = QuestionKind.SingleChoice(
+                        options = listOf(
+                            QuestionOption("walk_breath", "散步/深呼吸后好些"),
+                            QuestionOption("rest_music", "休息/听音乐后好些"),
+                            QuestionOption("chat_support", "聊天/倾诉后好些"),
+                            QuestionOption("still_bad", "效果不明显"),
+                            QuestionOption("not_try", "还没尝试")
+                        )
+                    )
+                )
+            )
+        ),
+        FollowUpRule(
+            symptomQuestionId = "sleep_duration",
+            focusOptionId = "sleep",
+            extraPredicate = { answers ->
+                (answers["sleep_duration"] as? DailyAnswerPayload.Choice)?.optionId == "fragmented"
+            },
+            questions = listOf(
+                DailyQuestion(
+                    id = "fu_sleep_issue",
+                    title = "睡眠最主要的问题是哪个？",
+                    prompt = "帮助我判断是入睡、维持还是醒后疲惫。",
+                    step = DailyQuestionStep.FollowUp,
+                    order = 160,
+                    required = true,
+                    kind = QuestionKind.SingleChoice(
+                        options = listOf(
+                            QuestionOption("hard_to_sleep", "入睡困难"),
+                            QuestionOption("wake_up", "夜间易醒/多梦"),
+                            QuestionOption("early_wake", "醒得太早"),
+                            QuestionOption("not_rested", "睡了但不解乏"),
+                            QuestionOption("unclear", "不确定")
+                        )
+                    )
+                ),
+                DailyQuestion(
+                    id = "fu_sleep_hygiene",
+                    title = "昨晚哪些因素可能影响了睡眠？",
+                    prompt = "选最相关的一项就可以。",
+                    step = DailyQuestionStep.FollowUp,
+                    order = 161,
+                    required = true,
+                    kind = QuestionKind.SingleChoice(
+                        options = listOf(
+                            QuestionOption("late_screen", "睡前看屏幕较久"),
+                            QuestionOption("late_meal", "晚餐太晚或太饱"),
+                            QuestionOption("caffeine", "咖啡/茶/功能饮料"),
+                            QuestionOption("stress", "压力或思虑多"),
+                            QuestionOption("none", "无明显影响因素")
+                        )
+                    )
+                )
+            )
+        ),
+        FollowUpRule(
+            symptomQuestionId = "nasal_intensity",
+            focusOptionId = "chest",
+            questions = listOf(
+                DailyQuestion(
+                    id = "fu_chest_pattern",
+                    title = "胸闷或呼吸不适主要在什么情况下出现？",
+                    prompt = "用来区分活动相关还是静息相关不适。",
+                    step = DailyQuestionStep.FollowUp,
+                    order = 170,
+                    required = true,
+                    kind = QuestionKind.SingleChoice(
+                        options = listOf(
+                            QuestionOption("activity", "活动后更明显"),
+                            QuestionOption("rest", "静息时也明显"),
+                            QuestionOption("anxiety", "紧张焦虑时加重"),
+                            QuestionOption("night", "夜间/清晨更明显"),
+                            QuestionOption("unclear", "不固定")
+                        )
+                    )
+                ),
+                DailyQuestion(
+                    id = "fu_chest_companion",
+                    title = "是否伴随以下表现？",
+                    prompt = "请选最接近你当下感受的一项。",
+                    step = DailyQuestionStep.FollowUp,
+                    order = 171,
+                    required = true,
+                    kind = QuestionKind.SingleChoice(
+                        options = listOf(
+                            QuestionOption("palpitation", "心悸/心跳快"),
+                            QuestionOption("cough", "咳嗽或痰多"),
+                            QuestionOption("pain", "胸前区疼痛"),
+                            QuestionOption("dizzy", "头晕乏力"),
+                            QuestionOption("none", "无明显伴随症状")
+                        )
+                    )
+                )
+            )
+        ),
+        FollowUpRule(
+            symptomQuestionId = "nasal_intensity",
+            focusOptionId = "skin",
+            questions = listOf(
+                DailyQuestion(
+                    id = "fu_skin_pattern",
+                    title = "皮肤不适更接近哪一种？",
+                    prompt = "帮助我判断是否和过敏或刺激相关。",
+                    step = DailyQuestionStep.FollowUp,
+                    order = 180,
+                    required = true,
+                    kind = QuestionKind.SingleChoice(
+                        options = listOf(
+                            QuestionOption("itch", "瘙痒为主"),
+                            QuestionOption("rash", "泛红/皮疹"),
+                            QuestionOption("dry", "干燥脱屑"),
+                            QuestionOption("sting", "刺痛/灼热"),
+                            QuestionOption("mixed", "多种情况并存")
+                        )
+                    )
+                ),
+                DailyQuestion(
+                    id = "fu_skin_trigger",
+                    title = "今天是否接触了新的刺激因素？",
+                    prompt = "如护肤品、清洁剂、花粉、粉尘等。",
+                    step = DailyQuestionStep.FollowUp,
+                    order = 181,
+                    required = true,
+                    kind = QuestionKind.SingleChoice(
+                        options = listOf(
+                            QuestionOption("new_product", "新产品/新材质"),
+                            QuestionOption("environment", "环境刺激（花粉粉尘）"),
+                            QuestionOption("food", "饮食后出现"),
+                            QuestionOption("unknown", "不确定"),
+                            QuestionOption("none", "无明显诱因")
+                        )
+                    )
+                )
+            )
+        ),
+        FollowUpRule(
+            symptomQuestionId = "headache_intensity",
+            focusOptionId = "eyes",
+            questions = listOf(
+                DailyQuestion(
+                    id = "fu_eyes_pattern",
+                    title = "眼部不适主要是哪种表现？",
+                    prompt = "帮你区分视疲劳、干眼或刺激反应。",
+                    step = DailyQuestionStep.FollowUp,
+                    order = 190,
+                    required = true,
+                    kind = QuestionKind.SingleChoice(
+                        options = listOf(
+                            QuestionOption("dry", "干涩/异物感"),
+                            QuestionOption("sore", "酸胀/疲劳"),
+                            QuestionOption("blur", "视物模糊"),
+                            QuestionOption("light", "畏光/流泪"),
+                            QuestionOption("mixed", "多种表现")
+                        )
+                    )
+                ),
+                DailyQuestion(
+                    id = "fu_eyes_trigger",
+                    title = "是否与用眼时长相关？",
+                    prompt = "比如长时间看屏幕、夜间用眼等。",
+                    step = DailyQuestionStep.FollowUp,
+                    order = 191,
+                    required = true,
+                    kind = QuestionKind.SingleChoice(
+                        options = listOf(
+                            QuestionOption("screen", "长时间看屏幕后加重"),
+                            QuestionOption("night", "夜间用眼后明显"),
+                            QuestionOption("wind", "风吹/空调后明显"),
+                            QuestionOption("none", "相关性不明显"),
+                            QuestionOption("unclear", "不确定")
+                        )
+                    )
+                )
+            )
+        ),
+        FollowUpRule(
+            symptomQuestionId = "mood_irritability",
+            focusOptionId = "fatigue",
+            questions = listOf(
+                DailyQuestion(
+                    id = "fu_fatigue_timing",
+                    title = "乏力在一天中哪个时段最明显？",
+                    prompt = "有助于判断作息和节律相关性。",
+                    step = DailyQuestionStep.FollowUp,
+                    order = 200,
+                    required = true,
+                    kind = QuestionKind.SingleChoice(
+                        options = listOf(
+                            QuestionOption("morning", "起床后就明显"),
+                            QuestionOption("noon", "中午到下午明显"),
+                            QuestionOption("evening", "傍晚/晚上明显"),
+                            QuestionOption("all_day", "全天都明显"),
+                            QuestionOption("random", "不固定")
+                        )
+                    )
+                ),
+                DailyQuestion(
+                    id = "fu_fatigue_companion",
+                    title = "乏力通常伴随什么情况？",
+                    prompt = "选最常见的伴随表现。",
+                    step = DailyQuestionStep.FollowUp,
+                    order = 201,
+                    required = true,
+                    kind = QuestionKind.SingleChoice(
+                        options = listOf(
+                            QuestionOption("sleepy", "嗜睡/注意力差"),
+                            QuestionOption("dizzy", "头晕/站立无力"),
+                            QuestionOption("appetite", "食欲下降"),
+                            QuestionOption("stress", "压力大、恢复慢"),
+                            QuestionOption("none", "无明显伴随")
+                        )
+                    )
+                )
+            )
         )
     )
 

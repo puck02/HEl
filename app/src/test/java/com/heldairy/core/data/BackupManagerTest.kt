@@ -385,4 +385,6 @@ private class FakeMedicationDao : com.heldairy.core.database.MedicationDao {
     override suspend fun clearAllEvents() {}
     override suspend fun clearAllCourses() {}
     override suspend fun clearAllMeds() {}
+    override suspend fun loadAllMedsSuspend(): List<com.heldairy.core.database.entity.MedEntity> = emptyList()
+    override suspend fun loadAllCoursesSuspend(): List<com.heldairy.core.database.entity.MedCourseEntity> = emptyList()
 }

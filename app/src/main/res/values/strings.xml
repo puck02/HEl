@@ -46,10 +46,10 @@
 
     <!-- Data Management -->
     <string name="settings_data_section">数据管理</string>
-    <string name="settings_clear_all_data">清空所有数据</string>
-    <string name="settings_clear_data_warning">清空所有日报记录和用药记录，但会保留用户名、头像和 API Key。清空后数据无法恢复，建议先导出备份。</string>
-    <string name="settings_clear_data_confirm_title">确认清空所有数据？</string>
-    <string name="settings_clear_data_confirm_message">此操作将清空：\n• 所有日报记录及相关数据\n• 所有用药记录及提醒\n\n将保留：用户名、头像、API Key\n\n⚠️ 此操作无法撤销！建议先导出备份。</string>
+    <string name="settings_clear_all_data">清空服务器数据</string>
+    <string name="settings_clear_data_warning">清空服务器上你的所有健康数据、用药记录和 AI 记忆。清空后数据无法恢复，请谨慎操作。</string>
+    <string name="settings_clear_data_confirm_title">确认清空服务器数据？</string>
+    <string name="settings_clear_data_confirm_message">此操作将清空服务器上：\n• 所有日报记录及 AI 建议\n• 所有用药记录及疗程\n• 所有 AI 记忆\n\n将保留：账号、用户名、头像\n\n⚠️ 此操作无法撤销！</string>
     <string name="settings_all_data_cleared">所有数据已清空</string>
 
     <!-- Daily Report -->

@@ -47,4 +47,48 @@ class FollowUpRuleEngineTest {
 
         assertFalse(followUps.any { it.id.startsWith("fu_headache") })
     }
+
+    @Test
+    fun triggersSleepFollowUpsWhenFocusPriorityContainsSleep() {
+        val answers = mapOf(
+            "sleep_duration" to DailyAnswerPayload.Choice("6_7"),
+            "focus_priority" to DailyAnswerPayload.MultiChoice(setOf("sleep"))
+        )
+
+        val followUps = FollowUpRuleEngine.evaluate(
+            answers = answers,
+            trends = emptyMap()
+        )
+
+        assertTrue(followUps.any { it.id == "fu_sleep_issue" })
+    }
+
+    @Test
+    fun triggersSleepFollowUpsWhenSleepIsFragmented() {
+        val answers = mapOf(
+            "sleep_duration" to DailyAnswerPayload.Choice("fragmented")
+        )
+
+        val followUps = FollowUpRuleEngine.evaluate(
+            answers = answers,
+            trends = emptyMap()
+        )
+
+        assertTrue(followUps.any { it.id == "fu_sleep_hygiene" })
+    }
+
+    @Test
+    fun triggersFatigueFollowUpsWhenPrioritySelected() {
+        val answers = mapOf(
+            "mood_irritability" to DailyAnswerPayload.Slider(3),
+            "focus_priority" to DailyAnswerPayload.MultiChoice(setOf("fatigue"))
+        )
+
+        val followUps = FollowUpRuleEngine.evaluate(
+            answers = answers,
+            trends = emptyMap()
+        )
+
+        assertTrue(followUps.any { it.id == "fu_fatigue_timing" })
+    }
 }

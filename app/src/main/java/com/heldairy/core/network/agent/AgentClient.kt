@@ -290,6 +290,14 @@ class AgentClient(
         return api.syncStatus()
     }
 
+    // ── Clear Data ───────────────────────────────────────
+
+    /** 清除服务器上当前用户的所有数据 */
+    suspend fun clearUserData(): Result<Unit> {
+        ensureReady()
+        return runCatching { api.clearUserData() }.map { }
+    }
+
     // ── Health Check ─────────────────────────────────────
 
     /** 检测 Agent 服务器是否可达 */

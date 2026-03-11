@@ -47,47 +47,51 @@ object DailyQuestionBank {
     val questions: List<DailyQuestion> = listOf(
         DailyQuestion(
             id = "overall_feeling",
-            title = "今天心情怎么样呀～",
-            prompt = "Kitty 会根据你的状态调整今天的问题数量哦～",
+            title = "今天整体状态怎么样呀～",
+            prompt = "按第一直觉选择就好，我会根据你的状态动态调整追问。",
             step = DailyQuestionStep.Greeting,
             order = 0,
             required = true,
             kind = QuestionKind.SingleChoice(
                 options = listOf(
-                    QuestionOption("great", "很好"),
-                    QuestionOption("ok", "还行"),
-                    QuestionOption("unwell", "有点不舒服"),
-                    QuestionOption("awful", "很难受")
+                    QuestionOption("great", "状态很好"),
+                    QuestionOption("ok", "还可以"),
+                    QuestionOption("unwell", "有些不适"),
+                    QuestionOption("awful", "明显不舒服")
                 )
             )
         ),
         DailyQuestion(
             id = "focus_priority",
             title = "今天想让 Kitty 特别关注哪里呀？",
-            prompt = "告诉我～我会重点陪你一起看看这些部位～",
+            prompt = "常见身体不适部位都可以选，我会优先围绕你选中的区域追问。",
             step = DailyQuestionStep.Greeting,
             order = 1,
             required = true,
             kind = QuestionKind.MultipleChoice(
                 options = listOf(
-                    QuestionOption("head", "头痛"),
-                    QuestionOption("neck_back", "颈肩腰"),
-                    QuestionOption("stomach", "胃"),
-                    QuestionOption("nasal", "鼻咽"),
-                    QuestionOption("knee", "膝盖"),
-                    QuestionOption("emotion", "情绪"),
+                    QuestionOption("head", "头部/面部不适"),
+                    QuestionOption("nasal", "鼻咽/呼吸道"),
+                    QuestionOption("neck_back", "颈肩/背腰"),
+                    QuestionOption("knee", "关节/四肢"),
+                    QuestionOption("stomach", "腹部/胃肠"),
+                    QuestionOption("chest", "胸闷/心前区不适"),
+                    QuestionOption("skin", "皮肤/过敏反应"),
+                    QuestionOption("eyes", "眼睛疲劳/不适"),
                     QuestionOption("sleep", "睡眠"),
-                    QuestionOption("period", "经期"),
+                    QuestionOption("emotion", "情绪/压力"),
+                    QuestionOption("fatigue", "乏力/精力不足"),
+                    QuestionOption("period", "经期相关"),
                     QuestionOption("none", "没有特别")
                 ),
-                maxSelection = 3,
-                helper = "最多选择 3 个关注点"
+                maxSelection = 4,
+                helper = "最多选择 4 个关注点"
             )
         ),
         DailyQuestion(
             id = "sleep_duration",
-            title = "昨晚睡得好吗？睡了多久呀～",
-            prompt = "凭感觉选就好～",
+            title = "昨晚睡眠时长大概多久？",
+            prompt = "按大概区间选就好，不需要精确到分钟。",
             step = DailyQuestionStep.Baseline,
             order = 2,
             required = true,
@@ -96,14 +100,15 @@ object DailyQuestionBank {
                     QuestionOption("lt6", "少于 6 小时"),
                     QuestionOption("6_7", "6-7 小时"),
                     QuestionOption("7_8", "7-8 小时"),
-                    QuestionOption("gt8", "多于 8 小时")
+                    QuestionOption("gt8", "多于 8 小时"),
+                    QuestionOption("fragmented", "睡眠断续/质量较差")
                 )
             )
         ),
         DailyQuestion(
             id = "nap_duration",
-            title = "中午有休息一下吗～",
-            prompt = "没有午睡就选【无】哦～",
+            title = "今天白天有小睡或闭目休息吗？",
+            prompt = "没有休息就选【无】。",
             step = DailyQuestionStep.Baseline,
             order = 3,
             required = true,
@@ -112,14 +117,15 @@ object DailyQuestionBank {
                     QuestionOption("none", "无"),
                     QuestionOption("lt30", "少于 30 分钟"),
                     QuestionOption("30_60", "30-60 分钟"),
-                    QuestionOption("gt60", "多于 60 分钟")
+                    QuestionOption("gt60", "多于 60 分钟"),
+                    QuestionOption("break_only", "仅短暂放松未入睡")
                 )
             )
         ),
         DailyQuestion(
             id = "daily_steps",
-            title = "今天走了多少步呀～",
-            prompt = "大概估计就好，不用太精确～",
+            title = "今天活动量大概如何？",
+            prompt = "可按步数估计，或按体感选择最接近的区间。",
             step = DailyQuestionStep.Baseline,
             order = 4,
             required = true,
@@ -128,14 +134,15 @@ object DailyQuestionBank {
                     QuestionOption("lt3k", "少于 3k"),
                     QuestionOption("3_6k", "3-6k"),
                     QuestionOption("6_10k", "6-10k"),
-                    QuestionOption("gt10k", "多于 10k")
+                    QuestionOption("gt10k", "多于 10k"),
+                    QuestionOption("unknown", "不确定")
                 )
             )
         ),
         DailyQuestion(
             id = "headache_intensity",
-            title = "今天头有不舒服吗～",
-            prompt = "0 是完全没感觉，10 是很明显～轻轻滑动就好～",
+            title = "头部不适强度（头痛/头胀/头晕）",
+            prompt = "0 表示完全没有，10 表示非常明显。",
             step = DailyQuestionStep.Baseline,
             order = 5,
             required = true,
@@ -148,8 +155,8 @@ object DailyQuestionBank {
         ),
         DailyQuestion(
             id = "neck_back_intensity",
-            title = "脖子肩膀腰有紧绷或疼痛吗～",
-            prompt = "0 到 10 随心选～",
+            title = "颈肩背腰不适强度",
+            prompt = "包含僵硬、酸痛、牵拉感等。",
             step = DailyQuestionStep.Baseline,
             order = 6,
             required = true,
@@ -161,8 +168,8 @@ object DailyQuestionBank {
         ),
         DailyQuestion(
             id = "stomach_intensity",
-            title = "今天胃舒服吗～",
-            prompt = "很平稳的话就选 0 哦～",
+            title = "腹部/胃肠不适强度",
+            prompt = "如胃痛、腹胀、反酸、恶心等可综合评估。",
             step = DailyQuestionStep.Baseline,
             order = 7,
             required = true,
@@ -174,8 +181,8 @@ object DailyQuestionBank {
         ),
         DailyQuestion(
             id = "nasal_intensity",
-            title = "鼻子喉咙有不舒服吗～",
-            prompt = "像是干痒、鼻塞、喉咙有异物感这些都算～",
+            title = "鼻咽/呼吸道不适强度",
+            prompt = "如鼻塞、流涕、咽痛、咳嗽、呼吸不畅等。",
             step = DailyQuestionStep.Baseline,
             order = 8,
             required = true,
@@ -187,8 +194,8 @@ object DailyQuestionBank {
         ),
         DailyQuestion(
             id = "knee_intensity",
-            title = "膝盖有不舒服吗～",
-            prompt = "运动后或天气变化的酸胀都可以记录～",
+            title = "关节/四肢不适强度",
+            prompt = "膝盖、踝、手腕或肌肉酸痛都可按整体感受打分。",
             step = DailyQuestionStep.Baseline,
             order = 9,
             required = true,
@@ -200,8 +207,8 @@ object DailyQuestionBank {
         ),
         DailyQuestion(
             id = "mood_irritability",
-            title = "今天情绪有点烦躁吗～",
-            prompt = "0 是很平静，10 是特别烦躁～",
+            title = "情绪压力/烦躁强度",
+            prompt = "0 是很平稳，10 是明显焦虑或压力很大。",
             step = DailyQuestionStep.Baseline,
             order = 10,
             required = true,
@@ -213,22 +220,23 @@ object DailyQuestionBank {
         ),
         DailyQuestion(
             id = "chill_exposure",
-            title = "今天有受凉吗～",
-            prompt = "像是空调直吹、湿冷环境这些都算～",
+            title = "今天有明显外界刺激吗？",
+            prompt = "如受凉、淋雨、温差大、空调直吹等。",
             step = DailyQuestionStep.Baseline,
             order = 11,
             required = true,
             kind = QuestionKind.SingleChoice(
                 options = listOf(
                     QuestionOption("yes", "有"),
-                    QuestionOption("no", "没有")
+                    QuestionOption("no", "没有"),
+                    QuestionOption("unsure", "不确定")
                 )
             )
         ),
         DailyQuestion(
             id = "medication_adherence",
-            title = "今天药按时吃了吗～",
-            prompt = "没有用药计划就选【无需/未用】哦～",
+            title = "今天的用药/补充剂执行情况如何？",
+            prompt = "包含处方药、OTC、保健补充剂等。",
             step = DailyQuestionStep.Baseline,
             order = 12,
             required = true,
@@ -236,14 +244,15 @@ object DailyQuestionBank {
                 options = listOf(
                     QuestionOption("on_time", "按时"),
                     QuestionOption("missed", "有遗漏"),
-                    QuestionOption("na", "无需/未用")
+                    QuestionOption("na", "无需/未用"),
+                    QuestionOption("adjusted", "有临时调整")
                 )
             )
         ),
         DailyQuestion(
             id = "menstrual_status",
-            title = "今天是经期吗～",
-            prompt = "不适用的话就选【非经期】哦～",
+            title = "是否有经期/激素相关不适？",
+            prompt = "如不适用可选择【不适用】。",
             step = DailyQuestionStep.Baseline,
             order = 13,
             required = true,
@@ -251,14 +260,15 @@ object DailyQuestionBank {
                 options = listOf(
                     QuestionOption("period", "经期"),
                     QuestionOption("non_period", "非经期"),
-                    QuestionOption("irregular", "有异常")
+                    QuestionOption("irregular", "有异常"),
+                    QuestionOption("na", "不适用")
                 )
             )
         ),
         DailyQuestion(
             id = "daily_notes",
-            title = "还有什么想告诉 Kitty 的吗～",
-            prompt = "今天的小细节、药物调整、明天的计划...想说什么都可以～",
+            title = "还有什么补充信息想告诉 Kitty？",
+            prompt = "可记录诱因、缓解方式、药物变化、就医计划等。",
             step = DailyQuestionStep.Baseline,
             order = 14,
             required = false,

@@ -21,6 +21,7 @@ import com.heldairy.core.network.agent.SyncResponse
 import com.heldairy.core.network.agent.SyncStatusResponse
 import com.heldairy.core.network.agent.SyncUploadRequest
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
@@ -87,6 +88,9 @@ interface AgentApi {
 
     @GET("api/v1/sync/status")
     suspend fun syncStatus(): SyncStatusResponse
+
+    @DELETE("api/v1/sync/clear-data")
+    suspend fun clearUserData(): Map<String, String>
 
     // ── Health Check ─────────────────────────────────────
 

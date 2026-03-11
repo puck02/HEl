@@ -75,6 +75,7 @@ class HomeDashboardViewModel(
             "6_10k" -> "接近目标"
             "3_6k" -> "再多走走"
             "lt3k" -> "需要活动"
+            "unknown" -> "建议记录步数"
             else -> null
         }
         val displayValue = response.answerLabel.ifBlank { response.answerValue }
@@ -87,6 +88,7 @@ class HomeDashboardViewModel(
                 "6_10k" -> 0.75f
                 "3_6k" -> 0.5f
                 "lt3k" -> 0.25f
+                "unknown" -> 0.4f
                 else -> 0f
             }
         }
@@ -100,6 +102,7 @@ class HomeDashboardViewModel(
             "7_8" -> "稳定"
             "6_7" -> "略短"
             "lt6" -> "偏少"
+            "fragmented" -> "睡眠断续"
             else -> null
         }
         val value = response.answerLabel.ifBlank { response.answerValue }
@@ -112,6 +115,7 @@ class HomeDashboardViewModel(
                 "7_8" -> 0.85f
                 "6_7" -> 0.6f
                 "lt6" -> 0.3f
+                "fragmented" -> 0.35f
                 else -> 0f
             }
         }
@@ -165,6 +169,7 @@ class HomeDashboardViewModel(
             "7_8" -> 95
             "6_7" -> 70
             "lt6" -> 40
+            "fragmented" -> 45
             else -> 50
         }
         
@@ -174,6 +179,7 @@ class HomeDashboardViewModel(
             "6_10k" -> 80
             "3_6k" -> 60
             "lt3k" -> 30
+            "unknown" -> 50
             null -> 50  // 无运动数据时给中等分
             else -> 50
         }
@@ -199,6 +205,7 @@ class HomeDashboardViewModel(
                 "7_8" -> 95
                 "6_7" -> 70
                 "lt6" -> 40
+                "fragmented" -> 45
                 else -> 0
             }
             
@@ -207,6 +214,7 @@ class HomeDashboardViewModel(
                 "6_10k" -> 80
                 "3_6k" -> 60
                 "lt3k" -> 30
+                "unknown" -> 50
                 else -> 0
             }
             

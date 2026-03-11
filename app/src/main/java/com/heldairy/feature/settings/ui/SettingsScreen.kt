@@ -1,18 +1,14 @@
 package com.heldairy.feature.settings.ui
 
-import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,8 +32,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.ui.res.painterResource
 import com.heldairy.R
-import androidx.compose.material.icons.outlined.CloudDownload
-import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Visibility
@@ -51,7 +45,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -63,7 +56,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,9 +63,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -84,19 +74,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.heldairy.feature.settings.SettingsEvent
 import com.heldairy.feature.settings.SettingsUiState
 import com.heldairy.feature.settings.SettingsViewModel
-import java.io.OutputStreamWriter
-import java.time.LocalDate
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.layout.width
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.LinearProgressIndicator
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlin.text.Charsets
 
 @Composable
 fun SettingsRoute(
@@ -106,47 +90,6 @@ fun SettingsRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    val exportJsonLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                viewModel.exportJson()
-                    .onSuccess { content ->
-                        val writeResult = writeTextToUri(context, uri, content)
-                        if (writeResult.isSuccess) {
-                            viewModel.showMessage(context.getString(R.string.settings_export_json) + " 完成")
-                        } else {
-                            viewModel.showMessage(writeResult.exceptionOrNull()?.message ?: context.getString(R.string.error_unknown))
-                        }
-                    }
-                    .onFailure { viewModel.showMessage(it.message ?: context.getString(R.string.error_unknown)) }
-            }
-        }
-    }
-
-    val importJsonLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                val readResult = readTextFromUri(context, uri)
-                if (readResult.isSuccess) {
-                    val importResult = viewModel.importJson(readResult.getOrThrow())
-                    if (importResult.isSuccess) {
-                        viewModel.showMessage(context.getString(R.string.settings_import_json) + " 完成")
-                    } else {
-                        viewModel.showMessage(importResult.exceptionOrNull()?.message ?: context.getString(R.string.error_unknown))
-                    }
-                } else {
-                    viewModel.showMessage(readResult.exceptionOrNull()?.message ?: context.getString(R.string.error_unknown))
-                }
-            }
-        }
-    }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collectLatest { event ->
@@ -163,16 +106,10 @@ fun SettingsRoute(
         KittyBackground(backgroundRes = BackgroundTheme.SETTINGS) {
             SettingsScreen(
                 state = uiState,
-                onApiKeyChanged = viewModel::onApiKeyChanged,
-                onSaveApiKey = viewModel::saveApiKey,
-                onClearApiKey = viewModel::clearApiKey,
-                onAiEnabledChanged = viewModel::onAiEnabledChanged,
                 onDailyReminderEnabledChanged = viewModel::onDailyReminderEnabledChanged,
                 onUserNameChanged = viewModel::onUserNameChanged,
                 onSaveUserName = viewModel::saveUserName,
                 onAvatarSelected = { uri -> viewModel.updateAvatar(uri?.toString()) },
-                onExportJson = { exportJsonLauncher.launch(defaultBackupFileName("json")) },
-                onImportJson = { importJsonLauncher.launch("application/json") },
                 onClearAllData = { viewModel.clearAllData() },
                 // Agent
                 onAgentServerUrlChanged = viewModel::onAgentServerUrlChanged,
@@ -199,16 +136,10 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
-    onApiKeyChanged: (String) -> Unit,
-    onSaveApiKey: () -> Unit,
-    onClearApiKey: () -> Unit,
-    onAiEnabledChanged: (Boolean) -> Unit,
     onDailyReminderEnabledChanged: (Boolean) -> Unit,
     onUserNameChanged: (String) -> Unit,
     onSaveUserName: () -> Unit,
     onAvatarSelected: (Uri?) -> Unit,
-    onExportJson: () -> Unit,
-    onImportJson: () -> Unit,
     onClearAllData: () -> Unit,
     // Agent
     onAgentServerUrlChanged: (String) -> Unit = {},
@@ -247,11 +178,6 @@ fun SettingsScreen(
             onAvatarSelected = onAvatarSelected
         )
         
-        AiToggleSection(
-            aiEnabled = state.aiEnabled,
-            onAiEnabledChanged = onAiEnabledChanged
-        )
-        
         // 日报提醒开关
         DailyReminderSection(
             enabled = state.dailyReminderEnabled,
@@ -260,20 +186,6 @@ fun SettingsScreen(
 
         // 电池优化引导卡片
         BatteryOptimizationCard()
-
-        ApiKeySection(
-            apiKeyInput = state.apiKeyInput,
-            isApiKeyDirty = state.isApiKeyDirty,
-            isSaving = state.isSaving,
-            onApiKeyChanged = onApiKeyChanged,
-            onSave = onSaveApiKey,
-            onClear = onClearApiKey
-        )
-
-        BackupSection(
-            onExportJson = onExportJson,
-            onImportJson = onImportJson
-        )
 
         // Agent 智能体配置
         AgentSection(
@@ -292,40 +204,10 @@ fun SettingsScreen(
             onForceFullSync = onForceFullSync
         )
 
-        DataManagementSection(onClearAllData = onClearAllData)
-    }
-}
-
-@Composable
-private fun AiToggleSection(
-    aiEnabled: Boolean,
-    onAiEnabledChanged: (Boolean) -> Unit
-) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-        ),
-        shape = RoundedCornerShape(CornerRadius.Medium),
-        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.M),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.S)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = stringResource(R.string.settings_ai_enable), style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-                Text(
-                    text = stringResource(R.string.settings_ai_enable_description),
-                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(checked = aiEnabled, onCheckedChange = onAiEnabledChanged)
-        }
+        DataManagementSection(
+            onClearAllData = onClearAllData,
+            isClearingData = state.isClearingData
+        )
     }
 }
 
@@ -363,104 +245,10 @@ private fun DailyReminderSection(
 }
 
 @Composable
-private fun ApiKeySection(
-    apiKeyInput: String,
-    isApiKeyDirty: Boolean,
-    isSaving: Boolean,
-    onApiKeyChanged: (String) -> Unit,
-    onSave: () -> Unit,
-    onClear: () -> Unit
+private fun DataManagementSection(
+    onClearAllData: () -> Unit,
+    isClearingData: Boolean = false
 ) {
-    var showApiKey by remember { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
-        Text(text = stringResource(R.string.settings_api_key_label), style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-            ),
-            shape = RoundedCornerShape(CornerRadius.Medium),
-            elevation = CardDefaults.cardElevation(defaultElevation = Elevation.None),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            OutlinedTextField(
-                value = apiKeyInput,
-                onValueChange = onApiKeyChanged,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.S, vertical = Spacing.XS),
-                visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
-                placeholder = { Text(stringResource(R.string.settings_api_key_placeholder)) },
-                trailingIcon = {
-                    IconButton(onClick = { showApiKey = !showApiKey }) {
-                        Icon(
-                            imageVector = if (showApiKey) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                            contentDescription = if (showApiKey) stringResource(R.string.cd_hide_password) else stringResource(R.string.cd_show_password),
-                            tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(CornerRadius.Medium),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
-                    unfocusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                    focusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                    cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                )
-            )
-            ActionRow(
-                isDirty = isApiKeyDirty,
-                isSaving = isSaving,
-                onSave = onSave,
-                onClear = onClear
-            )
-        }
-        InfoCard(text = stringResource(R.string.settings_api_key_info))
-    }
-}
-
-@Composable
-private fun BackupSection(
-    onExportJson: () -> Unit,
-    onImportJson: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.XS)
-        ) {
-            Text(text = stringResource(R.string.settings_backup_section), style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-            StickerDecoration(
-                drawableRes = R.drawable.strawberry,
-                size = 32.dp,
-                rotation = 12f,
-                alpha = 0.55f,
-                modifier = Modifier.offset(x = 4.dp, y = (-2).dp)
-            )
-        }
-        Text(
-            text = stringResource(R.string.settings_backup_description),
-            style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        StandardButton(
-            text = stringResource(R.string.settings_export_json),
-            icon = Icons.Outlined.CloudUpload,
-            onClick = onExportJson,
-            modifier = Modifier.fillMaxWidth()
-        )
-        StandardButton(
-            text = stringResource(R.string.settings_import_json),
-            icon = Icons.Outlined.CloudDownload,
-            onClick = onImportJson,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-}
-
-@Composable
-private fun DataManagementSection(onClearAllData: () -> Unit) {
     var showClearDataDialog by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.S)) {
         Text(text = stringResource(R.string.settings_data_section), style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
@@ -469,12 +257,24 @@ private fun DataManagementSection(onClearAllData: () -> Unit) {
             style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
             color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
         )
-        OutlinedActionButton(
-            text = stringResource(R.string.settings_clear_all_data),
-            icon = Icons.Outlined.DeleteSweep,
-            onClick = { showClearDataDialog = true },
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (isClearingData) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(Spacing.S))
+                Text("正在清除服务器数据…", style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+            }
+        } else {
+            OutlinedActionButton(
+                text = stringResource(R.string.settings_clear_all_data),
+                icon = Icons.Outlined.DeleteSweep,
+                onClick = { showClearDataDialog = true },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
     if (showClearDataDialog) {
         androidx.compose.material3.AlertDialog(
@@ -500,29 +300,6 @@ private fun DataManagementSection(onClearAllData: () -> Unit) {
                 }
             }
         )
-    }
-}
-
-@Composable
-private fun ActionRow(
-    isDirty: Boolean,
-    isSaving: Boolean,
-    onSave: () -> Unit,
-    onClear: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Spacing.S, vertical = Spacing.XS),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        TextButton(onClick = onSave, enabled = isDirty && !isSaving) {
-            Text(text = if (isSaving) stringResource(R.string.saving) else stringResource(R.string.settings_save_api_key))
-        }
-        TextButton(onClick = onClear) {
-            Text(stringResource(R.string.settings_clear_api_key), color = androidx.compose.material3.MaterialTheme.colorScheme.primary)
-        }
     }
 }
 
@@ -932,34 +709,3 @@ private fun AgentSection(
         }
     }
 }
-
-// ─── Utility functions ──────────────────────────────────────────────
-private fun defaultBackupFileName(extension: String): String {
-    val date = LocalDate.now().toString()
-    val suffix = if (extension == "csv") "export" else "backup"
-    return "heldairy-$suffix-$date.$extension"
-}
-
-private suspend fun writeTextToUri(
-    context: Context,
-    uri: Uri,
-    content: String
-): Result<Unit> = withContext(Dispatchers.IO) {
-    runCatching {
-        context.contentResolver.openOutputStream(uri)?.use { output ->
-            OutputStreamWriter(output, Charsets.UTF_8).use { writer ->
-                writer.write(content)
-            }
-        } ?: error("Write error")
-    }
-}
-
-private suspend fun readTextFromUri(context: Context, uri: Uri): Result<String> =
-    withContext(Dispatchers.IO) {
-        runCatching {
-            context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
-                reader.readText()
-            } ?: error("Read error")
-        }
-    }
-
