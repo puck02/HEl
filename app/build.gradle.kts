@@ -5,6 +5,10 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.heldairy"
     compileSdk = 34
@@ -77,6 +81,7 @@ ksp {
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
+    val firebaseBom = platform("com.google.firebase:firebase-bom:33.5.1")
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")
@@ -123,6 +128,10 @@ dependencies {
 
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // Firebase Cloud Messaging
+    implementation(firebaseBom)
+    implementation("com.google.firebase:firebase-messaging-ktx")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

@@ -299,6 +299,20 @@ class AgentClient(
         return api.syncStatus()
     }
 
+    suspend fun upsertPushToken(token: String, platform: String = "android"): Result<Unit> {
+        ensureReady()
+        return runCatching {
+            api.upsertPushToken(PushTokenUpsertRequest(token = token, platform = platform))
+        }.map { }
+    }
+
+    suspend fun deletePushToken(token: String): Result<Unit> {
+        ensureReady()
+        return runCatching {
+            api.deletePushToken(PushTokenDeleteRequest(token = token))
+        }.map { }
+    }
+
     // ── Clear Data ───────────────────────────────────────
 
     /** 清除服务器上当前用户的所有数据 */

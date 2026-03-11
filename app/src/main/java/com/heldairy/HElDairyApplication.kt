@@ -3,6 +3,7 @@ package com.heldairy
 import android.app.Application
 import com.heldairy.core.di.AppContainer
 import com.heldairy.core.di.AppContainerImpl
+import com.heldairy.core.notification.FcmTokenRegistrar
 import com.heldairy.core.worker.WorkScheduler
 import com.heldairy.feature.medication.reminder.ReminderScheduler
 import com.heldairy.feature.report.reminder.DailyReportReminderScheduler
@@ -44,5 +45,8 @@ class HElDairyApplication : Application() {
                 e.printStackTrace()
             }
         }
+
+        // Best-effort register FCM token to backend for realtime push.
+        FcmTokenRegistrar.registerCurrentToken(applicationContext)
     }
 }

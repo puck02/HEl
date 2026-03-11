@@ -322,9 +322,31 @@ data class SyncTombstone(
 )
 
 @Serializable
+data class AgentServerNotification(
+    val id: String,
+    val title: String,
+    val body: String,
+    val type: String = "general",
+    val data: Map<String, JsonElement> = emptyMap(),
+    @SerialName("created_at") val createdAt: Long = 0
+)
+
+@Serializable
 data class SyncPullResponse(
     val changes: List<SyncEntityEnvelope> = emptyList(),
     val tombstones: List<SyncTombstone> = emptyList(),
+    val notifications: List<AgentServerNotification> = emptyList(),
     @SerialName("next_cursor") val nextCursor: Long = 0,
     @SerialName("server_time") val serverTime: Long = 0
+)
+
+@Serializable
+data class PushTokenUpsertRequest(
+    val token: String,
+    val platform: String = "android"
+)
+
+@Serializable
+data class PushTokenDeleteRequest(
+    val token: String
 )

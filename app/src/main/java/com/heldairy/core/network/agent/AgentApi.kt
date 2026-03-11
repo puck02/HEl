@@ -89,6 +89,12 @@ interface AgentApi {
     @GET("api/v1/sync/status")
     suspend fun syncStatus(): SyncStatusResponse
 
+    @POST("api/v1/sync/push-token")
+    suspend fun upsertPushToken(@Body body: PushTokenUpsertRequest): Map<String, String>
+
+    @retrofit2.http.HTTP(method = "DELETE", path = "api/v1/sync/push-token", hasBody = true)
+    suspend fun deletePushToken(@Body body: PushTokenDeleteRequest): Map<String, String>
+
     @DELETE("api/v1/sync/clear-data")
     suspend fun clearUserData(): Map<String, String>
 

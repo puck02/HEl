@@ -63,6 +63,8 @@ interface AppContainer {
 }
 
 class AppContainerImpl(context: Context) : AppContainer {
+    private val appContext: Context = context.applicationContext
+
     override val database = DailyReportDatabase.build(context)
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -202,7 +204,8 @@ class AppContainerImpl(context: Context) : AppContainer {
             DataSyncManager(
                 database = database,
                 agentClient = client,
-                agentPrefs = agentPreferencesStore
+                agentPrefs = agentPreferencesStore,
+                appContext = appContext
             )
         }
 

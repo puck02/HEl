@@ -1,6 +1,8 @@
 package com.heldairy.core.data
 
+import android.content.Context
 import android.util.Log
+import com.heldairy.core.notification.ServerNotificationHelper
 import com.heldairy.core.database.DailyReportDatabase
 import com.heldairy.core.database.entity.DailyAdviceEntity
 import com.heldairy.core.database.entity.DailyEntryEntity
@@ -14,6 +16,7 @@ import com.heldairy.core.network.agent.HealthEntrySync
 import com.heldairy.core.network.agent.MedicationCourseSync
 import com.heldairy.core.network.agent.MedicationSync
 import com.heldairy.core.network.agent.QuestionResponseSync
+import com.heldairy.core.network.agent.AgentServerNotification
 import com.heldairy.core.network.agent.SyncTombstone
 import com.heldairy.core.network.agent.SyncUploadRequest
 import com.heldairy.core.preferences.AgentPreferencesStore
@@ -42,6 +45,7 @@ class DataSyncManager(
     private val database: DailyReportDatabase,
     private val agentClient: AgentClient,
     private val agentPrefs: AgentPreferencesStore,
+    private val appContext: Context,
     private val json: Json = Json { ignoreUnknownKeys = true }
 ) {
     companion object {
@@ -112,6 +116,9 @@ class DataSyncManager(
                 }
                 if (pull.tombstones.isNotEmpty()) {
                     applyPulledTombstones(pull.tombstones)
+                }
+                if (pull.notifications.isNotEmpty()) {
+                    processServerNotifications(pull.notifications)
                 }
                 nextSyncTs = maxOf(nextSyncTs, pull.nextCursor, pull.serverTime)
             }.onFailure {
@@ -296,6 +303,16 @@ class DataSyncManager(
                 "health_entry" -> deleteHealthEntry(tombstone)
                 "medication" -> deleteMedication(tombstone)
                 "medication_course" -> deleteMedicationCourse(tombstone)
+            }
+        }
+    }
+
+    private fun processServerNotifications(notifications: List<AgentServerNotification>) {
+        notifications.forEach { item ->
+            runCatching {
+                ServerNotificationHelper.show(appContext, item)
+            }.onFailure {
+                Log.w(TAG, "show server notification failed: ${it.message}")
             }
         }
     }
