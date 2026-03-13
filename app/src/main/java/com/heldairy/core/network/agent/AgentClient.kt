@@ -9,9 +9,20 @@ import com.heldairy.core.network.NetworkMonitor
 import com.heldairy.core.network.NetworkUnavailableException
 import com.heldairy.core.preferences.AgentPreferencesStore
 import com.heldairy.feature.medication.MedicationNlpResult
+import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
 
 /**
@@ -30,6 +41,8 @@ class AgentClient(
     companion object {
         private const val TAG = "AgentClient"
     }
+
+    private val json = Json { ignoreUnknownKeys = true }
 
     // ── 前置检查 ──────────────────────────────────────────
 
@@ -131,6 +144,135 @@ class AgentClient(
             }
         }
     }
+
+    suspend fun chatStream(
+        message: String,
+        sessionId: String? = null,
+        onProgress: suspend (AgentChatProgressEvent) -> Unit,
+    ): Result<AgentChatResponse> {
+        ensureReady()
+        val settings = agentPrefs.currentSettings()
+        val baseUrl = settings.serverUrl.trimEnd('/')
+        val bodyJson = buildString {
+            append("{\"message\":")
+            append(json.encodeToString(String.serializer(), message))
+            if (!sessionId.isNullOrBlank()) {
+                append(",\"session_id\":")
+                append(json.encodeToString(String.serializer(), sessionId))
+            }
+            append("}")
+        }
+
+        val client = OkHttpClient.Builder()
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .callTimeout(130, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+
+        suspend fun executeWithToken(accessToken: String): Result<AgentChatResponse> {
+            val req = Request.Builder()
+                .url("$baseUrl/api/v1/chat/stream")
+                .header("Authorization", "Bearer $accessToken")
+                .header("Accept", "text/event-stream")
+                .post(bodyJson.toRequestBody("application/json".toMediaType()))
+                .build()
+
+            val resp = runCatching { client.newCall(req).execute() }.getOrElse { e ->
+                return Result.failure(e)
+            }
+
+            resp.use { response ->
+                if (response.code == 401) {
+                    return Result.failure(StreamUnauthorizedException())
+                }
+                if (!response.isSuccessful) {
+                    return Result.failure(IllegalStateException("聊天请求失败（HTTP ${response.code}）"))
+                }
+
+                val reader = response.body?.charStream()?.buffered() ?: return Result.failure(IOException("empty stream body"))
+                var eventType: String? = null
+                var dataLine: String? = null
+
+                reader.forEachLine { line ->
+                    when {
+                        line.startsWith("event:") -> eventType = line.removePrefix("event:").trim()
+                        line.startsWith("data:") -> dataLine = line.removePrefix("data:").trim()
+                        line.isBlank() -> {
+                            val eType = eventType
+                            val dLine = dataLine
+                            if (!eType.isNullOrBlank() && !dLine.isNullOrBlank()) {
+                                val obj = runCatching {
+                                    json.parseToJsonElement(dLine).jsonObject
+                                }.getOrNull()
+                                if (obj != null) {
+                                    when (eType) {
+                                        "progress" -> {
+                                            val progress = AgentChatProgressEvent(
+                                                stage = obj["stage"]?.jsonPrimitive?.content ?: "processing",
+                                                message = obj["message"]?.jsonPrimitive?.content ?: "处理中...",
+                                                elapsedMs = obj["elapsed_ms"]?.jsonPrimitive?.intOrNull,
+                                            )
+                                            kotlinx.coroutines.runBlocking { onProgress(progress) }
+                                        }
+                                        "done" -> {
+                                            val answer = obj["answer"]?.jsonPrimitive?.content ?: ""
+                                            val sid = obj["session_id"]?.jsonPrimitive?.content ?: (sessionId ?: "")
+                                            val agentUsed = obj["agent_used"]?.jsonPrimitive?.contentOrNull
+                                            val modelUsed = obj["model_used"]?.jsonPrimitive?.contentOrNull
+                                            val responseMs = obj["response_time_ms"]?.jsonPrimitive?.intOrNull
+                                            throw DoneSignal(
+                                                AgentChatResponse(
+                                                    answer = answer,
+                                                    sessionId = sid,
+                                                    agentUsed = agentUsed,
+                                                    modelUsed = modelUsed,
+                                                    responseTimeMs = responseMs,
+                                                    trace = emptyList()
+                                                )
+                                            )
+                                        }
+                                        "error" -> {
+                                            val msg = obj["message"]?.jsonPrimitive?.content ?: "聊天处理失败"
+                                            throw IllegalStateException(msg)
+                                        }
+                                    }
+                                }
+                            }
+                            eventType = null
+                            dataLine = null
+                        }
+                    }
+                }
+                return Result.failure(IllegalStateException("流式响应未返回 done 事件"))
+            }
+        }
+
+        return try {
+            executeWithToken(settings.accessToken)
+        } catch (done: DoneSignal) {
+            Result.success(done.response)
+        } catch (t: Throwable) {
+            if (t is StreamUnauthorizedException && settings.refreshToken.isNotBlank()) {
+                return try {
+                    val refresh = api.refreshToken(AgentRefreshRequest(settings.refreshToken))
+                    agentPrefs.updateTokens(refresh.accessToken, refresh.refreshToken)
+                    try {
+                        executeWithToken(refresh.accessToken)
+                    } catch (done: DoneSignal) {
+                        Result.success(done.response)
+                    }
+                } catch (refreshErr: Throwable) {
+                    runCatching { agentPrefs.clearLogin() }
+                    Result.failure(IllegalStateException("登录已失效，请重新登录 Agent", refreshErr))
+                }
+            }
+            Result.failure(t)
+        }
+    }
+
+    private class DoneSignal(val response: AgentChatResponse) : RuntimeException(null, null, false, false)
+    private class StreamUnauthorizedException : RuntimeException(null, null, false, false)
 
     // ── Health — Daily Advice ────────────────────────────
 

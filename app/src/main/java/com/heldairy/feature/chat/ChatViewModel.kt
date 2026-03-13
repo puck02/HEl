@@ -17,13 +17,16 @@ data class ChatMessage(
     val id: String,
     val text: String,
     val isFromUser: Boolean,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val responseTimeMs: Int? = null
 )
 
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val inputText: String = "",
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val showProgressPanel: Boolean = false,
+    val progressLogs: List<String> = emptyList()
 )
 
 class ChatViewModel(
@@ -58,7 +61,9 @@ class ChatViewModel(
         _uiState.value = _uiState.value.copy(
             messages = _uiState.value.messages + userMsg + loadingMsg,
             inputText = "",
-            isLoading = true
+            isLoading = true,
+            showProgressPanel = true,
+            progressLogs = listOf("开始处理请求...")
         )
 
         viewModelScope.launch {
@@ -74,17 +79,28 @@ class ChatViewModel(
                 return@launch
             }
 
-            agentClient.chat(text, sessionId).fold(
+            agentClient.chatStream(
+                message = text,
+                sessionId = sessionId,
+                onProgress = { event ->
+                    appendProgress(formatProgress(event.stage, event.message, event.elapsedMs))
+                }
+            ).fold(
                 onSuccess = { resp ->
                     sessionId = resp.sessionId
                     replaceLoading(
                         ChatMessage(
                             id = "ai_${System.currentTimeMillis()}",
                             text = resp.answer,
-                            isFromUser = false
+                            isFromUser = false,
+                            responseTimeMs = resp.responseTimeMs
                         )
                     )
-                    _uiState.value = _uiState.value.copy(isLoading = false)
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        showProgressPanel = false,
+                        progressLogs = emptyList()
+                    )
                 },
                 onFailure = { err ->
                     replaceLoading(
@@ -94,10 +110,23 @@ class ChatViewModel(
                             isFromUser = false
                         )
                     )
-                    _uiState.value = _uiState.value.copy(isLoading = false)
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        showProgressPanel = false
+                    )
                 }
             )
         }
+    }
+
+    private fun appendProgress(line: String) {
+        val logs = (_uiState.value.progressLogs + line).takeLast(80)
+        _uiState.value = _uiState.value.copy(progressLogs = logs)
+    }
+
+    private fun formatProgress(stage: String, message: String, elapsedMs: Int?): String {
+        val elapsed = elapsedMs?.let { " (${it}ms)" } ?: ""
+        return "[$stage] $message$elapsed"
     }
 
     private fun replaceLoading(msg: ChatMessage) {

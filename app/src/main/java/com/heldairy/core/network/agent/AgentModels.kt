@@ -60,7 +60,15 @@ data class AgentChatResponse(
     @SerialName("answer") val answer: String,
     @SerialName("session_id") val sessionId: String,
     @SerialName("agent_used") val agentUsed: String? = null,
-    @SerialName("model_used") val modelUsed: String? = null
+    @SerialName("model_used") val modelUsed: String? = null,
+    @SerialName("response_time_ms") val responseTimeMs: Int? = null,
+    @SerialName("trace") val trace: List<Map<String, JsonElement>> = emptyList()
+)
+
+data class AgentChatProgressEvent(
+    val stage: String,
+    val message: String,
+    val elapsedMs: Int? = null
 )
 
 // ── Health — Daily Advice ────────────────────────────────

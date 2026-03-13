@@ -8,6 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -49,13 +51,18 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -67,6 +74,7 @@ import com.heldairy.ui.theme.BackgroundTheme
 import com.heldairy.ui.theme.CornerRadius
 import com.heldairy.ui.theme.KittyBackground
 import com.heldairy.ui.theme.Spacing
+import android.widget.Toast
 
 @Composable
 fun ChatRoute(
@@ -93,10 +101,17 @@ fun ChatScreen(
     onSendMessage: () -> Unit
 ) {
     val listState = rememberLazyListState()
+    val progressListState = rememberLazyListState()
 
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
             listState.animateScrollToItem(uiState.messages.size - 1)
+        }
+    }
+
+    LaunchedEffect(uiState.progressLogs.size) {
+        if (uiState.progressLogs.isNotEmpty()) {
+            progressListState.animateScrollToItem(uiState.progressLogs.size - 1)
         }
     }
 
@@ -190,19 +205,58 @@ fun ChatScreen(
                 }
             }
         ) { innerPadding ->
-            if (uiState.messages.isEmpty()) {
-                ChatWelcome(modifier = Modifier.padding(innerPadding))
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentPadding = PaddingValues(horizontal = Spacing.M, vertical = Spacing.S),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.S)
-                ) {
-                    items(uiState.messages, key = { it.id }) { msg ->
-                        MessageBubble(message = msg)
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (uiState.messages.isEmpty()) {
+                    ChatWelcome(modifier = Modifier.padding(innerPadding))
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                        contentPadding = PaddingValues(horizontal = Spacing.M, vertical = Spacing.S),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.S)
+                    ) {
+                        items(uiState.messages, key = { it.id }) { msg ->
+                            MessageBubble(message = msg)
+                        }
+                    }
+                }
+
+                if (uiState.showProgressPanel) {
+                    Card(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.M, vertical = 110.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Medium)
+                    ) {
+                        Column(modifier = Modifier.padding(Spacing.M)) {
+                            Text(
+                                text = "正在推理与工具调用...",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(Spacing.XS))
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            Spacer(modifier = Modifier.height(Spacing.S))
+                            LazyColumn(
+                                state = progressListState,
+                                modifier = Modifier.height(140.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                items(uiState.progressLogs) { line ->
+                                    Text(
+                                        text = line,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -242,6 +296,10 @@ private fun ChatWelcome(modifier: Modifier = Modifier) {
 
 @Composable
 private fun MessageBubble(message: ChatMessage) {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    val copyText = remember(message.text) { message.text.trim() }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (message.isFromUser) Arrangement.End else Arrangement.Start
@@ -271,22 +329,42 @@ private fun MessageBubble(message: ChatMessage) {
                 else
                     MaterialTheme.colorScheme.surfaceVariant
             ),
-            modifier = Modifier.widthIn(max = 280.dp)
+            modifier = Modifier
+                .widthIn(max = 280.dp)
+                .pointerInput(copyText) {
+                    detectTapGestures(
+                        onLongPress = {
+                            if (copyText.isNotBlank()) {
+                                clipboardManager.setText(AnnotatedString(copyText))
+                                Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+                }
         ) {
             if (message.isLoading) {
                 LoadingDots(
                     modifier = Modifier.padding(horizontal = Spacing.M, vertical = Spacing.S)
                 )
             } else {
-                Text(
-                    text = message.text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (message.isFromUser)
-                        MaterialTheme.colorScheme.onPrimary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.M, vertical = Spacing.S)
-                )
+                Column(modifier = Modifier.padding(horizontal = Spacing.M, vertical = Spacing.S)) {
+                    if (!message.isFromUser && message.responseTimeMs != null) {
+                        Text(
+                            text = "响应时间 ${message.responseTimeMs} ms",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                    }
+                    Text(
+                        text = message.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (message.isFromUser)
+                            MaterialTheme.colorScheme.onPrimary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
