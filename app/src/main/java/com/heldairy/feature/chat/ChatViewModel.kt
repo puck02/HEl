@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.heldairy.HElDairyApplication
 import com.heldairy.core.network.agent.AgentClient
+import com.heldairy.core.network.agent.AgentClientErrorMapper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -103,10 +104,11 @@ class ChatViewModel(
                     )
                 },
                 onFailure = { err ->
+                    val readableError = AgentClientErrorMapper.toUserMessage(err, "聊天请求失败，请稍后重试")
                     replaceLoading(
                         ChatMessage(
                             id = "err_${System.currentTimeMillis()}",
-                            text = "发送失败：${err.message ?: "未知错误"}",
+                            text = "发送失败：$readableError",
                             isFromUser = false
                         )
                     )

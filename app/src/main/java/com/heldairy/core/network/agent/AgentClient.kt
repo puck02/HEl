@@ -10,9 +10,6 @@ import com.heldairy.core.network.NetworkUnavailableException
 import com.heldairy.core.preferences.AgentPreferencesStore
 import com.heldairy.feature.medication.MedicationNlpResult
 import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.intOrNull
@@ -24,6 +21,114 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
+
+internal object AgentClientErrorMapper {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    fun mapAuthThrowable(t: Throwable): Throwable {
+        if (t is HttpException) {
+            val body = runCatching { t.response()?.errorBody()?.string() }.getOrNull()
+            val detail = extractBackendDetail(body)
+            val msg = when (t.code()) {
+                401 -> detail ?: "用户名或密码错误"
+                409 -> when {
+                    detail?.contains("username", ignoreCase = true) == true ||
+                        detail?.contains("用户名", ignoreCase = true) == true -> "用户名已存在，请直接登录"
+                    detail?.contains("email", ignoreCase = true) == true ||
+                        detail?.contains("邮箱", ignoreCase = true) == true -> "邮箱已被注册，请直接登录或更换邮箱"
+                    !detail.isNullOrBlank() -> detail
+                    else -> "账号已存在，请直接登录"
+                }
+                503 -> detail ?: "服务器暂时不可用，请稍后重试"
+                500 -> detail ?: "服务器内部错误，请稍后重试"
+                else -> detail ?: "请求失败（HTTP ${t.code()}）"
+            }
+            return IllegalStateException(msg, t)
+        }
+
+        if (t is java.net.ConnectException || t is java.net.SocketTimeoutException || t is java.net.UnknownHostException) {
+            val raw = t.message.orEmpty()
+            val hint = if (raw.contains("10.0.2.2")) {
+                "连接失败：10.0.2.2 仅用于 Android 模拟器；真机请使用电脑局域网 IP（如 http://172.20.x.x:8011）"
+            } else {
+                "连接失败：请检查服务器地址与端口，确保后端已启动"
+            }
+            return IllegalStateException(hint, t)
+        }
+
+        return IllegalStateException(toUserMessage(t, "请求失败"), t)
+    }
+
+    fun mapChatThrowable(t: Throwable): Throwable {
+        if (t is HttpException) {
+            val body = runCatching { t.response()?.errorBody()?.string() }.getOrNull()
+            val mapped = mapChatHttpError(t.code(), body)
+            return IllegalStateException(mapped.message, t)
+        }
+
+        if (t is IOException || t is java.net.ConnectException || t is java.net.SocketTimeoutException || t is java.net.UnknownHostException) {
+            return IllegalStateException("网络异常，请检查网络连接后重试", t)
+        }
+
+        return IllegalStateException(toUserMessage(t, "聊天请求失败，请稍后重试"), t)
+    }
+
+    fun mapChatHttpError(statusCode: Int, errorBody: String?): Throwable {
+        val detail = extractBackendDetail(errorBody)
+        val msg = when (statusCode) {
+            401 -> "登录已失效，请重新登录 Agent"
+            500, 502, 503, 504 -> detail ?: "服务暂时不可用，请稍后重试"
+            else -> detail ?: "聊天请求失败（HTTP $statusCode）"
+        }
+        return IllegalStateException(msg)
+    }
+
+    fun toUserMessage(t: Throwable, fallback: String): String {
+        val direct = t.message?.trim().orEmpty()
+        if (direct.isNotBlank()) return direct
+
+        return when (t) {
+            is java.net.ConnectException, is java.net.SocketTimeoutException, is java.net.UnknownHostException, is IOException ->
+                "网络异常，请检查网络连接后重试"
+            else -> fallback
+        }
+    }
+
+    fun extractBackendDetail(rawBody: String?): String? {
+        val body = rawBody?.trim().orEmpty()
+        if (body.isBlank()) return null
+
+        val parsed = runCatching { json.parseToJsonElement(body) }.getOrNull()
+        if (parsed != null) {
+            val candidate = extractText(parsed)
+            if (!candidate.isNullOrBlank()) return candidate
+        }
+
+        if (body.startsWith("\"") && body.endsWith("\"")) {
+            return body.removeSurrounding("\"").trim().takeIf { it.isNotBlank() }
+        }
+
+        return body.takeIf { it.isNotBlank() && !it.startsWith("<") }
+    }
+
+    private fun extractText(element: kotlinx.serialization.json.JsonElement): String? {
+        return when (element) {
+            is kotlinx.serialization.json.JsonObject -> {
+                val keys = listOf("detail", "message", "error", "msg", "reason")
+                keys.firstNotNullOfOrNull { key ->
+                    (element[key] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull()?.takeIf { it.isNotBlank() }
+                        ?: element[key]?.let { extractText(it) }
+                }
+            }
+            is kotlinx.serialization.json.JsonArray -> element.firstNotNullOfOrNull { extractText(it) }
+            is kotlinx.serialization.json.JsonPrimitive -> element.contentOrNull()?.takeIf { it.isNotBlank() }
+            else -> null
+        }
+    }
+
+    private fun kotlinx.serialization.json.JsonPrimitive.contentOrNull(): String? =
+        runCatching { content }.getOrNull()
+}
 
 /**
  * hel-agent 后端高级封装
@@ -100,33 +205,7 @@ class AgentClient(
     }
 
     private fun mapAuthThrowable(t: Throwable): Throwable {
-        if (t is HttpException) {
-            val body = runCatching { t.response()?.errorBody()?.string().orEmpty() }.getOrDefault("")
-            val msg = when (t.code()) {
-                401 -> "用户名或密码错误"
-                409 -> when {
-                    body.contains("Username already exists", ignoreCase = true) -> "用户名已存在，请直接登录"
-                    body.contains("Email already registered", ignoreCase = true) -> "邮箱已被注册，请直接登录或更换邮箱"
-                    else -> "账号已存在，请直接登录"
-                }
-                503 -> "服务器暂时不可用，请稍后重试"
-                500 -> "服务器内部错误，请稍后重试"
-                else -> "请求失败（HTTP ${t.code()}）"
-            }
-            return IllegalStateException(msg, t)
-        }
-
-        if (t is ConnectException || t is SocketTimeoutException || t is UnknownHostException) {
-            val raw = t.message.orEmpty()
-            val hint = if (raw.contains("10.0.2.2")) {
-                "连接失败：10.0.2.2 仅用于 Android 模拟器；真机请使用电脑局域网 IP（如 http://172.20.x.x:8011）"
-            } else {
-                "连接失败：请检查服务器地址与端口，确保后端已启动"
-            }
-            return IllegalStateException(hint, t)
-        }
-
-        return IllegalStateException(t.message ?: "请求失败", t)
+        return AgentClientErrorMapper.mapAuthThrowable(t)
     }
 
     // ── Chat ──────────────────────────────────────────────
@@ -138,9 +217,9 @@ class AgentClient(
         } catch (t: Throwable) {
             if (t is HttpException && t.code() == 401) {
                 runCatching { agentPrefs.clearLogin() }
-                Result.failure(IllegalStateException("登录已失效，请重新登录 Agent", t))
+                Result.failure(AgentClientErrorMapper.mapChatThrowable(t))
             } else {
-                Result.failure(t)
+                Result.failure(AgentClientErrorMapper.mapChatThrowable(t))
             }
         }
     }
@@ -179,7 +258,7 @@ class AgentClient(
                 .build()
 
             val resp = runCatching { client.newCall(req).execute() }.getOrElse { e ->
-                return Result.failure(e)
+                return Result.failure(AgentClientErrorMapper.mapChatThrowable(e))
             }
 
             resp.use { response ->
@@ -187,7 +266,8 @@ class AgentClient(
                     return Result.failure(StreamUnauthorizedException())
                 }
                 if (!response.isSuccessful) {
-                    return Result.failure(IllegalStateException("聊天请求失败（HTTP ${response.code}）"))
+                    val errorBody = runCatching { response.body?.string() }.getOrNull()
+                    return Result.failure(AgentClientErrorMapper.mapChatHttpError(response.code, errorBody))
                 }
 
                 val reader = response.body?.charStream()?.buffered() ?: return Result.failure(IOException("empty stream body"))
@@ -267,7 +347,7 @@ class AgentClient(
                     Result.failure(IllegalStateException("登录已失效，请重新登录 Agent", refreshErr))
                 }
             }
-            Result.failure(t)
+            Result.failure(AgentClientErrorMapper.mapChatThrowable(t))
         }
     }
 
