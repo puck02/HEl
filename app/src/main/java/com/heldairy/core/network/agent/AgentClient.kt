@@ -24,6 +24,16 @@ import retrofit2.HttpException
 
 internal object AgentClientErrorMapper {
     private val json = Json { ignoreUnknownKeys = true }
+    private val meaninglessErrorTexts = setOf(
+        "unknown",
+        "unknown error",
+        "未知错误",
+        "error",
+        "null",
+        "none",
+        "n/a",
+        "na"
+    )
 
     fun mapAuthThrowable(t: Throwable): Throwable {
         if (t is HttpException) {
@@ -74,7 +84,7 @@ internal object AgentClientErrorMapper {
     }
 
     fun mapChatHttpError(statusCode: Int, errorBody: String?): Throwable {
-        val detail = extractBackendDetail(errorBody)
+        val detail = extractBackendDetail(errorBody)?.takeUnless { isMeaninglessErrorText(it) }
         val msg = when (statusCode) {
             401 -> "登录已失效，请重新登录 Agent"
             500, 502, 503, 504 -> detail ?: "服务暂时不可用，请稍后重试"
@@ -85,7 +95,7 @@ internal object AgentClientErrorMapper {
 
     fun toUserMessage(t: Throwable, fallback: String): String {
         val direct = t.message?.trim().orEmpty()
-        if (direct.isNotBlank()) return direct
+        if (direct.isNotBlank() && !isMeaninglessErrorText(direct)) return direct
 
         return when (t) {
             is java.net.ConnectException, is java.net.SocketTimeoutException, is java.net.UnknownHostException, is IOException ->
@@ -128,6 +138,12 @@ internal object AgentClientErrorMapper {
 
     private fun kotlinx.serialization.json.JsonPrimitive.contentOrNull(): String? =
         runCatching { content }.getOrNull()
+
+    private fun isMeaninglessErrorText(raw: String): Boolean {
+        val normalized = raw.trim().trim('"', '\'', '`').lowercase()
+        if (normalized.isBlank()) return true
+        return normalized in meaninglessErrorTexts
+    }
 }
 
 /**

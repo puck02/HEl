@@ -26,6 +26,15 @@ class AgentErrorMapperTest {
     }
 
     @Test
+    fun toUserMessage_returnsFallbackWhenThrowableMessageUnknown() {
+        val unknownMessageThrowable = Throwable("未知错误")
+
+        val msg = AgentClientErrorMapper.toUserMessage(unknownMessageThrowable, "聊天请求失败，请稍后重试")
+
+        assertEquals("聊天请求失败，请稍后重试", msg)
+    }
+
+    @Test
     fun mapAuthThrowable_mapsUsernameConflictToFriendlyMessage() {
         val httpException = httpException(
             code = 409,
