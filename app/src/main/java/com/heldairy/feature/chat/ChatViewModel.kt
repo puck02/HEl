@@ -1,6 +1,8 @@
 package com.heldairy.feature.chat
 
 import android.app.Application
+import android.content.pm.ApplicationInfo
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -34,6 +36,9 @@ class ChatViewModel(
     application: Application,
     private val agentClient: AgentClient?
 ) : AndroidViewModel(application) {
+
+    private val isDebugBuild: Boolean =
+        (application.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -105,10 +110,21 @@ class ChatViewModel(
                 },
                 onFailure = { err ->
                     val readableError = AgentClientErrorMapper.toUserMessage(err, "聊天请求失败，请稍后重试")
+                    val detailMessage = err.message?.trim().orEmpty()
+                    val errorType = err::class.java.simpleName
+                    Log.e(TAG, "chat_send_failed type=$errorType detail=$detailMessage", err)
+
+                    val messageText = if (isDebugBuild) {
+                        val detail = detailMessage.ifBlank { "<empty>" }
+                        "发送失败：$readableError\n[DEBUG] type=$errorType detail=$detail"
+                    } else {
+                        "发送失败：$readableError"
+                    }
+
                     replaceLoading(
                         ChatMessage(
                             id = "err_${System.currentTimeMillis()}",
-                            text = "发送失败：$readableError",
+                            text = messageText,
                             isFromUser = false
                         )
                     )
@@ -139,6 +155,8 @@ class ChatViewModel(
     }
 
     companion object {
+        private const val TAG = "ChatViewModel"
+
         val Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HElDairyApplication
