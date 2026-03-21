@@ -76,6 +76,18 @@ internal object AgentClientErrorMapper {
             return IllegalStateException(mapped.message, t)
         }
 
+        if (t is IllegalArgumentException) {
+            val lower = t.message?.lowercase().orEmpty()
+            if (
+                lower.contains("url") ||
+                lower.contains("http") ||
+                lower.contains("https") ||
+                lower.contains("host")
+            ) {
+                return IllegalStateException("服务器地址格式错误，请在设置中填写 http://IP:端口", t)
+            }
+        }
+
         if (t is IOException || t is java.net.ConnectException || t is java.net.SocketTimeoutException || t is java.net.UnknownHostException) {
             return IllegalStateException("网络异常，请检查网络连接后重试", t)
         }
@@ -349,20 +361,26 @@ class AgentClient(
         } catch (done: DoneSignal) {
             Result.success(done.response)
         } catch (t: Throwable) {
-            if (t is StreamUnauthorizedException && settings.refreshToken.isNotBlank()) {
-                return try {
-                    val refresh = api.refreshToken(AgentRefreshRequest(settings.refreshToken))
-                    agentPrefs.updateTokens(refresh.accessToken, refresh.refreshToken)
-                    try {
-                        executeWithToken(refresh.accessToken)
-                    } catch (done: DoneSignal) {
-                        Result.success(done.response)
+            if (t is StreamUnauthorizedException) {
+                if (settings.refreshToken.isNotBlank()) {
+                    return try {
+                        val refresh = api.refreshToken(AgentRefreshRequest(settings.refreshToken))
+                        agentPrefs.updateTokens(refresh.accessToken, refresh.refreshToken)
+                        try {
+                            executeWithToken(refresh.accessToken)
+                        } catch (done: DoneSignal) {
+                            Result.success(done.response)
+                        }
+                    } catch (refreshErr: Throwable) {
+                        runCatching { agentPrefs.clearLogin() }
+                        Result.failure(IllegalStateException("登录已失效，请重新登录 Agent", refreshErr))
                     }
-                } catch (refreshErr: Throwable) {
-                    runCatching { agentPrefs.clearLogin() }
-                    Result.failure(IllegalStateException("登录已失效，请重新登录 Agent", refreshErr))
                 }
+
+                runCatching { agentPrefs.clearLogin() }
+                return Result.failure(IllegalStateException("登录已失效，请重新登录 Agent", t))
             }
+
             Result.failure(AgentClientErrorMapper.mapChatThrowable(t))
         }
     }

@@ -47,6 +47,16 @@ class AgentErrorMapperTest {
         assertEquals("用户名已存在，请直接登录", mapped.message)
     }
 
+    @Test
+    fun mapChatThrowable_mapsMalformedUrlToFriendlyHint() {
+        val throwable = IllegalArgumentException("Expected URL scheme 'http' or 'https' but no scheme was found")
+
+        val mapped = AgentClientErrorMapper.mapChatThrowable(throwable)
+
+        assertTrue(mapped is IllegalStateException)
+        assertEquals("服务器地址格式错误，请在设置中填写 http://IP:端口", mapped.message)
+    }
+
     private fun httpException(code: Int, body: String): HttpException {
         val responseBody = body.toResponseBody("application/json".toMediaType())
         val response = Response.error<Any>(code, responseBody)
