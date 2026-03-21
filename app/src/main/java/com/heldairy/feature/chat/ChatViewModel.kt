@@ -37,6 +37,8 @@ class ChatViewModel(
     private val agentClient: AgentClient?
 ) : AndroidViewModel(application) {
 
+    private val fallbackChatError = "聊天请求失败，请稍后重试"
+
     private val isDebugBuild: Boolean =
         (application.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
@@ -109,14 +111,17 @@ class ChatViewModel(
                     )
                 },
                 onFailure = { err ->
-                    val readableError = AgentClientErrorMapper.toUserMessage(err, "聊天请求失败，请稍后重试")
+                    val readableError = AgentClientErrorMapper.toUserMessage(err, fallbackChatError)
                     val detailMessage = err.message?.trim().orEmpty()
                     val errorType = err::class.java.simpleName
+                    val rootCauseType = generateSequence(err) { it.cause }.last()::class.java.simpleName
                     Log.e(TAG, "chat_send_failed type=$errorType detail=$detailMessage", err)
 
                     val messageText = if (isDebugBuild) {
                         val detail = detailMessage.ifBlank { "<empty>" }
-                        "发送失败：$readableError\n[DEBUG] type=$errorType detail=$detail"
+                        "发送失败：$readableError\n[DEBUG] type=$errorType cause=$rootCauseType detail=$detail"
+                    } else if (readableError == fallbackChatError) {
+                        "发送失败：$readableError（$rootCauseType）"
                     } else {
                         "发送失败：$readableError"
                     }
