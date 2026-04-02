@@ -25,6 +25,12 @@ HElDairy 是一个面向 Android（Android 10+）的原型应用，目标为提�
 ---
 HElDairy 是一个面向 Android（Android 10+）的原型应用，提供“生活管家”式的每日健康对话：记录日常指标、按规则触发跟进问题，并在可用时调用 DeepSeek AI 生成非诊断性的生活方式建议。应用以本地优先为原则，用户健康数据默认仅保存在设备上。
 
+<img width="983" height="699" alt="image" src="https://github.com/user-attachments/assets/007da8c6-4de5-4d28-b040-6f3ab8f00594" />
+
+<img width="1175" height="691" alt="image" src="https://github.com/user-attachments/assets/bd2a2ff8-b96a-4b21-a74e-2cb371030f9e" />
+
+
+
 目录
 ---
 - [HElDairy — AI 私人健康管家](#heldairy--ai-私人健康管家)
